@@ -1,10 +1,10 @@
-# Implementation Plan:
+# Implementation Plan
 
 ## Overview
 
 ### 目标
 
-基于 [SRS-需求分析文档](./spec/SRS-需求分析文档.md)，将「基于 Multi-Agent 与 RAG 的智能合同风险审查系统」分 4 个阶段（Phase 0-3）逐步落地，从环境搭建到完整架构交付。
+基于 [需求分析文档](requirement.md) 和 [设计文档](design.md)，将「基于 Multi-Agent 与 RAG 的智能合同风险审查系统」分 4 个阶段（Phase 0-3）逐步落地，从环境搭建到完整架构交付。
 
 ### 范围
 
