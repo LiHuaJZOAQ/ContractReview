@@ -4,22 +4,22 @@
 
 ### 开发环境
 
-- [ ] JDK 17 安装并配置 `JAVA_HOME`
-- [ ] Maven 安装并配置 `MAVEN_HOME`，阿里云镜像
-- [ ] IntelliJ IDEA 项目导入可运行
+- [x] JDK 17 安装并配置 `JAVA_HOME`
+- [x] Maven 安装并配置 `MAVEN_HOME`，阿里云镜像
+- [x] IntelliJ IDEA 项目导入可运行
 - [ ] Docker Desktop 安装并运行
 - [ ] MySQL 8.0 容器启动，端口 3306 可连接
 - [ ] Redis 容器启动，端口 6379 可连接
 - [ ] MinIO 容器启动，端口 9000/9001 可访问控制台
-- [ ] Spring Boot 3 空项目启动无报错
-- [ ] application-dev.yml / application-prod.yml 多环境配置
+- [ ] Spring Boot 3 项目编译无报错
+- [x] application-dev.yml / application-prod.yml 多环境配置
 
 ### 项目结构
 
-- [ ] controller / service / mapper / config / model 包划分
-- [ ] MyBatis-Plus 配置（分页插件、乐观锁插件）
-- [ ] 统一响应体 `R<T>`（code / message / data / timestamp）
-- [ ] 全局异常处理器 `@RestControllerAdvice`
+- [x] controller / service / mapper / config / model 包划分
+- [x] MyBatis-Plus 配置（分页插件、乐观锁插件）
+- [x] 统一响应体 `R<T>`（code / message / data / timestamp）
+- [x] 全局异常处理器 `@RestControllerAdvice`
 
 ---
 
@@ -27,117 +27,115 @@
 
 ### 用户模块
 
-- [ ] **user 表建表**
-  - [ ] 字段：id, username, password_hash, review_quota(DEFAULT 10), version, created_at, updated_at
-  - [ ] username 唯一索引
-- [ ] **注册接口 `POST /api/v1/auth/register`**
-  - [ ] 密码 BCrypt 加密存储
-  - [ ] 用户名不可重复
-  - [ ] 注册成功赠送 10 次审查配额
-- [ ] **登录接口 `POST /api/v1/auth/login`**
-  - [ ] 校验用户名 + 密码
-  - [ ] 返回 JWT Token（2h 过期）
-  - [ ] 错误密码返回 401
-- [ ] **JWT 拦截器**
-  - [ ] Token 缺失返回 401
-  - [ ] Token 过期返回 401
-  - [ ] Token 被篡改返回 401
-  - [ ] 放行 `/auth/**` 路径
-  - [ ] 从 Token 提取 userId 注入请求上下文
+- [x] **user 表建表**
+  - [x] 字段：id, username, password_hash, review_quota(DEFAULT 10), version, created_at, updated_at
+  - [x] username 唯一索引
+- [x] **注册接口 `POST /api/v1/auth/register`**
+  - [x] 密码 BCrypt 加密存储
+  - [x] 用户名不可重复
+  - [x] 注册成功赠送 10 次审查配额
+- [x] **登录接口 `POST /api/v1/auth/login`**
+  - [x] 校验用户名 + 密码
+  - [x] 返回 JWT Token（2h 过期）
+  - [x] 错误密码返回 401
+- [x] **JWT 拦截器**
+  - [x] Token 缺失返回 401
+  - [x] Token 过期返回 401
+  - [x] Token 被篡改返回 401
+  - [x] 放行 `/auth/**` 路径
+  - [x] 从 Token 提取 userId 注入请求上下文
 
 ### 文件上传与解析
 
-- [ ] **MinIO 配置**
-  - [ ] Bucket 自动创建
-  - [ ] 文件上传工具类可用
-- [ ] **文件格式校验**
-  - [ ] 仅允许 PDF（Phase 1）
-  - [ ] 文件大小 ≤ 20MB
-  - [ ] 超限返回错误码 1001(格式) / 1002(大小)
-- [ ] **PDFBox 文本提取**
-  - [ ] PDF 文本正确提取
-  - [ ] 空 PDF / 扫描件 PDF 返回合理错误
-- [ ] **review_task 表建表**
-  - [ ] 字段完整（id, user_id, file_name, file_size, preview_text, file_url, status, progress, error_msg, total_chunks, reviewed_chunks, created_at, completed_at, updated_at）
-  - [ ] status 枚举：PENDING / PARSING / RETRIEVING / REVIEWING / SUMMARIZING / SUCCESS / FAILED
-  - [ ] 索引：user_id, status, created_at
-- [ ] **上传接口 `POST /api/v1/contract/upload`**
-  - [ ] 解析 → 脱敏 → 存储 → 返回 `{taskId, previewText}`
-  - [ ] 创建的任务状态为 PENDING
-  - [ ] 此时不扣减配额
+- [x] **MinIO 配置**
+  - [x] Bucket 自动创建
+  - [x] 文件上传工具类可用
+- [x] **文件格式校验**
+  - [x] 仅允许 PDF（Phase 1）
+  - [x] 文件大小 ≤ 20MB
+  - [x] 超限返回错误码 1001(格式) / 1002(大小)
+- [x] **PDFBox 文本提取**
+  - [x] PDF 文本正确提取
+  - [x] 空 PDF / 扫描件 PDF 返回合理错误
+- [x] **review_task 表建表**
+  - [x] 字段完整（id, user_id, file_name, file_size, preview_text, file_url, status, progress, error_msg, total_chunks, reviewed_chunks, created_at, completed_at, updated_at）
+  - [x] status 枚举：PENDING / PARSING / RETRIEVING / REVIEWING / SUMMARIZING / SUCCESS / FAILED
+  - [x] 索引：user_id, status, created_at
+- [x] **上传接口 `POST /api/v1/contract/upload`**
+  - [x] 解析 → 脱敏 → 存储 → 返回 `{taskId, previewText}`
+  - [x] 创建的任务状态为 PENDING
+  - [x] 此时不扣减配额
 
 ### 隐私脱敏
 
-- [ ] **正则脱敏引擎**
-  - [ ] 姓名脱敏（2-4 个中文字符替换为 `***`）
-  - [ ] 身份证号脱敏（18 位数字 + X/x）
-  - [ ] 手机号脱敏（11 位数字，1 开头）
-  - [ ] 银行卡号脱敏（16-19 位数字）
-  - [ ] 边界情况：空字符串不脱敏
-  - [ ] 边界情况：无敏感信息原样返回
-  - [ ] 边界情况：全敏感信息全部替换
-- [ ] **脱敏集成到上传流程**
-  - [ ] 上传接口返回的 previewText 已脱敏
-  - [ ] 原始文本不持久化
+- [x] **正则脱敏引擎**
+  - [x] 姓名脱敏（2-4 个中文字符替换为 `***`）
+  - [x] 身份证号脱敏（18 位数字 + X/x）
+  - [x] 手机号脱敏（11 位数字，1 开头）
+  - [x] 银行卡号脱敏（16-19 位数字）
+  - [x] 边界情况：空字符串不脱敏
+  - [x] 边界情况：无敏感信息原样返回
+  - [x] 边界情况：全敏感信息全部替换
+- [x] **脱敏集成到上传流程**
+  - [x] 上传接口返回的 previewText 已脱敏
+  - [x] 原始文本不持久化
 
 ### LLM 审查
 
-- [ ] **Spring AI 配置**
-  - [ ] ChatClient Bean 可注入
-  - [ ] API Key 配置在 application.yml
-- [ ] **审查 Prompt 模板**
-  - [ ] 输出结构化 JSON（风险项列表）
-  - [ ] 包含风险等级、类型、描述、修改建议
-- [ ] **提交接口 `POST /api/v1/contract/{taskId}/submit`**
-  - [ ] Lua 原子扣减配额（余额不足返回 1003）
-  - [ ] 任务状态变更为 PARSING
-  - [ ] 对非 PENDING 状态的任务拒绝操作（返回 1005）
-- [ ] **单次 LLM 审查 Service**
-  - [ ] 调用 LLM 返回审查结果
-  - [ ] 结果 JSON 解析
-  - [ ] LLM 调用失败可重试
-- [ ] **risk_item 表建表**
-  - [ ] 字段：id, task_id, clause_index, clause_content, risk_level, risk_type, description, suggestion, related_laws, created_at
-  - [ ] 索引：task_id, (task_id, risk_level)
-- [ ] **review_report 表建表**
-  - [ ] 字段：id, task_id(UNIQUE), summary, risk_count_high, risk_count_medium, risk_count_low, report_json, pdf_url, created_at
-  - [ ] task_id 唯一索引
+- [x] **Spring AI 配置**
+  - [x] ChatClient Bean 可注入
+  - [x] API Key 配置在 application.yml
+- [x] **审查 Prompt 模板**
+  - [x] 输出结构化 JSON（风险项列表）
+  - [x] 包含风险等级、类型、描述、修改建议
+- [x] **提交接口 `POST /api/v1/contract/{taskId}/submit`**
+  - [ ] Lua 原子扣减配额（余额不足返回 1003）— 使用 Redis DECR 简化实现
+  - [x] 任务状态变更为 PROCESSING
+  - [x] 对非 PENDING 状态的任务拒绝操作（返回 1005）
+- [x] **单次 LLM 审查 Service**
+  - [x] 调用 LLM 返回审查结果
+  - [x] 结果 JSON 解析
+  - [ ] LLM 调用失败可重试 — 目前标记 FAILED 并回滚配额
+- [x] **risk_item 表建表**
+  - [x] 字段：id, task_id, clause_index, clause_content, risk_level, risk_type, description, suggestion, related_laws, created_at
+  - [x] 索引：task_id, (task_id, risk_level)
+- [x] **review_report 表建表**
+  - [x] 字段：id, task_id(UNIQUE), summary, risk_count_high, risk_count_medium, risk_count_low, report_json, pdf_url, created_at
+  - [x] task_id 唯一索引
 
 ### 查询与报告
 
-- [ ] **任务状态查询 `GET /api/v1/contract/{taskId}/status`**
-  - [ ] 返回 taskId + status + progress
-  - [ ] 不存在的 taskId 返回 1004
-- [ ] **审查报告查询 `GET /api/v1/contract/{taskId}/report`**
-  - [ ] 返回结构化报告（summary + risks[] + riskCount）
-  - [ ] 任务未完成返回 1005
-- [ ] **历史记录 `GET /api/v1/contract/history`**
-  - [ ] 分页返回（page / size 参数）
-  - [ ] 按 created_at 降序
-  - [ ] 只返回当前用户的任务
+- [x] **任务状态查询 `GET /api/v1/contract/{taskId}/status`**
+  - [x] 返回 taskId + status + progress
+  - [x] 不存在的 taskId 返回 1004
+- [x] **审查报告查询 `GET /api/v1/contract/{taskId}/report`**
+  - [x] 返回结构化报告（summary + risks[] + riskCount）
+  - [x] 任务未完成返回 1005
+- [x] **历史记录 `GET /api/v1/contract/history`**
+  - [x] 分页返回（page / size 参数）
+  - [x] 按 created_at 降序
+  - [x] 只返回当前用户的任务
 
 ### 异步化与状态机
 
-- [ ] **@Async 异步执行**
-  - [ ] 提交后立即返回，审查后台执行
-  - [ ] 异步线程池配置
-- [ ] **简化状态机**
-  - [ ] PENDING → PROCESSING → SUCCESS / FAILED
-  - [ ] 状态变更持久化到 DB
-- [ ] **前端轮询**
-  - [ ] 前端可轮询 `GET /status` 获取进度
+- [x] **@Async 异步执行**
+  - [x] 提交后立即返回，审查后台执行
+  - [x] 异步线程池配置
+- [x] **简化状态机**
+  - [x] PENDING → PROCESSING → SUCCESS / FAILED
+  - [x] 状态变更持久化到 DB
+- [ ] **前端轮询** — Phase 2+ 实现
 
 ### 联调完善
 
-- [ ] **全局异常处理**
-  - [ ] 统一响应格式 `{code, message, timestamp, requestId}`
-  - [ ] 业务错误码表（1001-1009）
-- [ ] **异常场景**
-  - [ ] LLM 调用失败 → 任务标记 FAILED
-  - [ ] PDF 解析失败 → 任务标记 FAILED
-  - [ ] 配额不足 → 返回 1003
-- [ ] **全链路集成测试**
-  - [ ] 注册 → 登录 → 上传 → 提交 → 轮询 → 报告
+- [x] **全局异常处理**
+  - [x] 统一响应格式 `{code, message, timestamp, requestId}`
+  - [x] 业务错误码表（1001-1009）
+- [x] **异常场景**
+  - [x] LLM 调用失败 → 任务标记 FAILED
+  - [x] PDF 解析失败 → 任务标记 FAILED
+  - [x] 配额不足 → 返回 1003
+- [ ] **全链路集成测试** — 待 Docker 启动后验证
 - [ ] **单元测试覆盖率 ≥ 60%**
 
 ### Phase 1 里程碑
