@@ -366,10 +366,10 @@ contract-review/
 | PARSING | 解析完成 / 解析失败 | RETRIEVING / FAILED |
 | RETRIEVING | 检索完成 | REVIEWING |
 | RETRIEVING | 检索失败且未超重试次数 | RETRIEVING（回退重试） |
-| RETRIEVING | 检索失败且超重试次数 | FAILED |
+| RETRIEVING | 检索失败且超重试次数（默认 3 次，可配置） | FAILED |
 | REVIEWING | 审查完成 | SUMMARIZING |
 | REVIEWING | 审查失败且未超重试次数 | REVIEWING（回退重试） |
-| REVIEWING | 审查失败且超重试次数 | FAILED |
+| REVIEWING | 审查失败且超重试次数（默认 3 次，可配置） | FAILED |
 | SUMMARIZING | 汇总完成 / 汇总失败 | SUCCESS / FAILED |
 | FAILED | 用户手动重试 | PENDING（重新排队） |
 
@@ -457,6 +457,14 @@ data 结构:
 prefetch: 10 (配合 Semaphore(10) 控制 Agent B 并发)
 ```
 
+**重试计数更新机制**：
+- 初始消息 `retryCount = 0`
+- 消费失败 NACK 时，RabbitMQ 自动将消息路由到 DLX
+- DLX 消费者检查 `retryCount < maxRetryCount`（默认 3，可配置）
+  - 若未超限：`retryCount++`，重新投递到主队列
+  - 若超限：标记任务 FAILED，不再重试
+- `retryCount` 在消息重新投递时递增，存储在消息属性中
+
 ### 交互流程说明
 
 #### 核心审查流程（正常路径）
@@ -479,12 +487,14 @@ prefetch: 10 (配合 Semaphore(10) 控制 Agent B 并发)
 ```lua
 -- KEYS[1] = user:quota:{userId}
 -- ARGV[1] = 1 (扣减数量)
+-- 原子操作：先判断余额 > 0 再扣减，避免竞态条件
 local quota = redis.call('GET', KEYS[1])
 if not quota or tonumber(quota) <= 0 then
     return -1  -- 余额不足
 end
-redis.call('DECRBY', KEYS[1], ARGV[1])
-return redis.call('GET', KEYS[1])
+-- 使用 DECRBY 原子扣减
+local newQuota = redis.call('DECRBY', KEYS[1], ARGV[1])
+return newQuota
 ```
 
 **回滚机制**（任务最终失败时触发）：
@@ -496,6 +506,8 @@ return redis.call('GET', KEYS[1])
        SET review_quota = review_quota + 1, version = version + 1
        WHERE id = ? AND version = ?
 ```
+
+> 注：由于采用 DECR 前判断方案，正常情况下不会出现负数配额；回滚机制仅用于任务失败时恢复配额。
 
 ---
 
