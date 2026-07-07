@@ -140,7 +140,7 @@
 ### 项目目录结构
 
 ```
-contract-review/
+ContractReview/
 ├── src/main/java/com/contractreview/
 │   ├── ContractReviewApplication.java          # 启动类
 │   │
