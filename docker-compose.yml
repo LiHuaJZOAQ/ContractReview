@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: contract-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: contract_review
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: contract-redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    container_name: contract-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+volumes:
+  mysql-data:
+  minio-data:

@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: contract-review
+  profiles:
+    active: dev
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+
+server:
+  port: 8080
+
+contract:
+  review:
+    max-retry-count: 3
+    desensitize:
+      enable: true
