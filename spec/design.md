@@ -137,6 +137,127 @@
 | **Agent 数量** | Agent 编排器支持动态增减 Agent，新增 Agent 注册到编排器即可参与工作流 | Phase 2+ |
 | **存储层** | MinIO 适配 S3 接口，可切换为阿里云 OSS / AWS S3 等 | Phase 3 |
 
+### 项目目录结构
+
+```
+contract-review/
+├── src/main/java/com/contractreview/
+│   ├── ContractReviewApplication.java          # 启动类
+│   │
+│   ├── config/                                 # 配置类
+│   │   ├── WebMvcConfig.java                   #   MVC 配置（拦截器、跨域）
+│   │   ├── MyBatisPlusConfig.java              #   分页插件、乐观锁插件
+│   │   ├── RedisConfig.java                    #   RedisTemplate 配置
+│   │   ├── RabbitMqConfig.java                 #   队列、交换机、DLX 定义
+│   │   ├── MinIoConfig.java                    #   MinIO 客户端配置
+│   │   ├── AsyncConfig.java                    #   异步线程池配置
+│   │   └── SpringAiConfig.java                 #   ChatClient Bean 配置
+│   │
+│   ├── controller/                             # REST 控制器层
+│   │   ├── AuthController.java                 #   注册 / 登录 / 刷新
+│   │   ├── ContractController.java             #   上传 / 提交 / 状态 / 报告 / SSE / 重试
+│   │   └── ...                                 #   其余控制器省略
+│   │
+│   ├── service/                                # 业务逻辑层
+│   │   ├── AuthService.java                    #   鉴权业务接口
+│   │   ├── ContractService.java                #   合同业务编排接口
+│   │   ├── FileParser.java                     #   文件解析（PDFBox / POI）
+│   │   ├── DesensitizationService.java         #   隐私脱敏
+│   │   ├── RagService.java                     #   RAG 检索（Chroma + 网络兜底）
+│   │   ├── AgentOrchestrator.java              #   Agent 工作流编排
+│   │   ├── TaskStateMachine.java               #   任务状态机
+│   │   ├── SseService.java                     #   SSE 推送
+│   │   ├── ReportService.java                  #   报告生成
+│   │   └── impl/                               #   实现类
+│   │       ├── AuthServiceImpl.java
+│   │       ├── ContractServiceImpl.java
+│   │       ├── FileParserImpl.java
+│   │       ├── DesensitizationServiceImpl.java
+│   │       ├── RagServiceImpl.java
+│   │       ├── AgentOrchestratorImpl.java
+│   │       ├── TaskStateMachineImpl.java
+│   │       ├── SseServiceImpl.java
+│   │       └── ReportServiceImpl.java
+│   │
+│   ├── mapper/                                 # MyBatis-Plus 数据访问层
+│   │   ├── UserMapper.java
+│   │   ├── ReviewTaskMapper.java
+│   │   ├── RiskItemMapper.java
+│   │   ├── ReviewReportMapper.java
+│   │   └── OperationLogMapper.java
+│   │
+│   ├── domain/                                 # 领域模型
+│   │   ├── entity/                             #   数据库实体
+│   │   │   ├── User.java
+│   │   │   ├── ReviewTask.java
+│   │   │   ├── RiskItem.java
+│   │   │   ├── ReviewReport.java
+│   │   │   └── OperationLog.java
+│   │   ├── dto/                                #   请求/响应 DTO
+│   │   │   ├── AuthRequest.java
+│   │   │   ├── AuthResponse.java
+│   │   │   ├── UploadResponse.java
+│   │   │   ├── SubmitRequest.java
+│   │   │   ├── StatusResponse.java
+│   │   │   └── ReportResponse.java
+│   │   └── enums/                              #   枚举
+│   │       ├── TaskStatus.java
+│   │       ├── RiskLevel.java
+│   │       └── ErrorCode.java                  #   业务错误码
+│   │
+│   ├── common/                                 # 通用组件
+│   │   ├── R.java                              #   统一响应体
+│   │   └── BusinessException.java              #   业务异常
+│   │
+│   ├── exception/                              # 异常处理
+│   │   └── GlobalExceptionHandler.java         #   全局异常处理器
+│   │
+│   ├── security/                               # 安全与鉴权
+│   │   ├── JwtUtils.java                       #   JWT 签发与校验
+│   │   ├── JwtInterceptor.java                 #   Token 拦截器
+│   │   └── UserContext.java                    #   请求上下文（ThreadLocal）
+│   │
+│   ├── ai/                                     # AI 引擎
+│   │   ├── agent/                              #   Multi-Agent 实现
+│   │   │   ├── ContractClassifierAgent.java    #   合同分类与定调
+│   │   │   ├── RiskScannerAgent.java           #   条款级风险扫描
+│   │   │   └── ReportSummarizerAgent.java      #   审查报告汇总
+│   │   └── rag/                                #   RAG 检索
+│   │       ├── ChunkingService.java            #    语义分块
+│   │       ├── EmbeddingService.java           #    向量化
+│   │       └── RetrievalService.java           #    混合检索（Chroma + 网络）
+│   │
+│   ├── async/                                  # 异步任务
+│   │   ├── ReviewTaskConsumer.java             #   MQ 消费者
+│   │   └── QuotaRollbackHandler.java           #   配额回滚处理器
+│   │
+│   └── util/                                   # 工具类
+│       ├── DesensitizationUtil.java            #   正则脱敏工具
+│       └── FileUtil.java                       #   文件校验工具
+│
+├── src/main/resources/                         # 资源文件
+│   ├── application.yml                         #   主配置
+│   ├── application-dev.yml                     #   开发环境配置
+│   ├── application-prod.yml                    #   生产环境配置
+│   ├── mapper/                                 #   MyBatis XML 映射文件
+│   └── db/                                     #   数据库脚本
+│       └── init.sql                            #   建表 DDL
+│
+├── src/test/java/com/contractreview/           # 测试
+│   ├── controller/                             #   控制器测试
+│   ├── service/                                #   服务测试
+│   └── util/                                   #   工具测试
+│
+├── web/                                        # 前端项目（Vue 3）
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.js
+│
+├── pom.xml                                     # Maven 构建
+└── README.md                                   # 项目说明
+```
+
 ### 核心交互架构图
 
 ```
