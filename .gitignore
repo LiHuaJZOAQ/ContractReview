@@ -1,0 +1,77 @@
+### Maven ###
+target/
+*.jar
+*.war
+*.zip
+*.tar.gz
+*.tar
+
+### IDE ###
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+.springBeans
+
+### OS ###
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+### Java ###
+*.class
+*.log
+*~
+*.tmp
+hs_err_pid*
+replay_pid*
+
+### Spring Boot ###
+**/application-local.yml
+**/application-dev.yml
+**/application-prod.yml
+!src/main/resources/application-example.yml
+!src/main/resources/application.yml
+*.yml.local
+*.yaml.local
+.env
+
+### Node / Vue ###
+node_modules/
+web/node_modules/
+web/dist/
+.npm/
+
+### Docker ###
+docker/volumes/
+docker-compose.override.yml
+
+### Logs ###
+logs/
+*.log
+**/logs/
+
+### Temp / Uploads ###
+uploads/
+temp/
+**/uploads/
+
+### MinIO local data ###
+minio-data/
+
+### Misc ###
+*.swp
+*.swo
+*~
+.DS_Store
+.attach_pid*
+
+### Agent ###
+AGENTS.md
