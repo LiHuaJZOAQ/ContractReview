@@ -75,3 +75,6 @@ minio-data/
 
 ### Agent ###
 AGENTS.md
+
+### Binary files ###
+*.pdf
