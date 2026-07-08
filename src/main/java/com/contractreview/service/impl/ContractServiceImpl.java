@@ -68,10 +68,10 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     @Transactional
-    public UploadResponse upload(MultipartFile file, Long userId) {
+    public UploadResponse upload(MultipartFile file, Long userId, boolean desensitize) {
         fileUtil.validateFile(file);
         String rawText = fileUtil.extractText(file);
-        String desensitizedText = DesensitizationUtil.desensitize(rawText);
+        String processedText = desensitize ? DesensitizationUtil.desensitize(rawText) : rawText;
 
         String fileUrl = uploadToMinio(file, userId);
 
@@ -79,13 +79,13 @@ public class ContractServiceImpl implements ContractService {
         task.setUserId(userId);
         task.setFileName(file.getOriginalFilename());
         task.setFileSize(file.getSize());
-        task.setPreviewText(desensitizedText);
+        task.setPreviewText(processedText);
         task.setFileUrl(fileUrl);
         task.setStatus("PENDING");
         task.setProgress(0);
         taskMapper.insert(task);
 
-        return new UploadResponse(task.getId(), desensitizedText);
+        return new UploadResponse(task.getId(), processedText);
     }
 
     private String uploadToMinio(MultipartFile file, Long userId) {
