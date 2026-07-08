@@ -13,6 +13,7 @@
 | V1.6 | 2026-07-06 | AI + 人工审查 | 新增第 12 章技术实施分级指南：Phase 0-3 分阶段实施路径、各模块分级方案、Phase 1 快速启动清单、技术学习优先级 |
 | V1.7 | 2026-07-06 | AI + 人工审查 | 技术错误修复：姓名正则拆分避免 lookbehind 长度不一致、补充 Token 刷新端点、Redis DECR 负数防护说明、SSE 推送触发机制补充、preview_text 清理时机明确、Agent B 并发与 MQ prefetch 关系补充、flk.npc.gov.cn 无 API 修正 |
 | V1.8 | 2026-07-06 | AI + 人工审查 | preview_text 改为 MEDIUMTEXT；补充 Refresh Token 存储方案（Redis，30 天过期）；提交流程同步 Lua 原子判断；register 接口补充 refreshToken 返回；验收标准 B4 改为命中率 ≥ 90% |
+| V1.9 | 2026-07-08 | AI + 人工审查 | 新增 F1.6 可选脱敏开关：上传接口增加 `desensitize` 参数，允许用户选择是否执行脱敏 |
 
 ---
 
@@ -139,8 +140,9 @@
 | F1.1 | PDF 文件解析 | P0 | 使用 Apache PDFBox 提取 PDF 文本 |
 | F1.2 | Word 文件解析 | P1 | 使用 Apache POI 提取 .doc / .docx 文本 |
 | F1.3 | 敏感信息脱敏 | P0 | 正则脱敏（P0）；NLP 实体识别增强（P1），将姓名、身份证号、手机号、银行卡号替换为 `***` |
-| F1.4 | 脱敏结果预览与确认提交 | P0 | 上传后返回脱敏文本供预览，用户通过确认接口正式提交审查任务 |
+| F1.4 | 脱敏结果预览与确认提交（可选脱敏） | P0 | 上传后返回脱敏文本供预览，用户通过确认接口正式提交审查任务。上传时可通过 `desensitize=false` 参数选择不脱敏，此时预览文本为原文 |
 | F1.5 | 文件格式校验 | P0 | 仅允许 PDF / Word，文件大小 ≤ 20MB |
+| F1.6 | 可选脱敏开关 | P0 | 上传接口增加 `desensitize` 参数（布尔值，默认 `true`），用户可关闭脱敏。关闭后 preview_text 直接存储原文，LLM 审查也基于原文。关闭脱敏时，用户需自行承担隐私风险 |
 
 #### 5.1.3 脱敏规则
 
@@ -289,7 +291,7 @@ SSE 使用三种事件类型，通过 `status` 字段标识阶段：
 
 | 需求 | 说明 |
 |------|------|
-| 隐私脱敏 | 上传后立即脱敏，原始文本解析后即丢弃，仅持久化脱敏后的文件 |
+| 隐私脱敏 | 上传后默认立即脱敏，原始文本解析后即丢弃，仅持久化脱敏后的文件。用户可通过 `desensitize=false` 选择不脱敏，此时原文作为 preview_text 存储，用户自行承担隐私风险 |
 | 传输加密 | 全链路 HTTPS |
 | 鉴权与防刷 | JWT 鉴权（Access Token 有效期 2 小时，Refresh Token 有效期 30 天，Redis 存储）+ Redis 滑动窗口限流 + 用户配额扣减 |
 | API 防滥用 | 限制单 IP / 单用户 QPS，超过阈值返回 429 |
@@ -439,7 +441,7 @@ ReviewTask (1) ──→ (1) ReviewReport
 | POST | `/api/v1/auth/register` | 用户注册 | `{username, password}` | `{userId, token, refreshToken}` |
 | POST | `/api/v1/auth/login` | 用户登录 | `{username, password}` | `{token, refreshToken}` |
 | POST | `/api/v1/auth/refresh` | Token 刷新 | `{refreshToken}` | `{token, refreshToken}` |
-| POST | `/api/v1/contract/upload` | 上传合同文件（解析脱敏后返回预览） | MultipartFile | `{taskId, previewText}` |
+| POST | `/api/v1/contract/upload` | 上传合同文件（解析脱敏后返回预览） | MultipartFile + `?desensitize=true`（可选，默认 true） | `{taskId, previewText}` |
 | POST | `/api/v1/contract/{taskId}/submit` | 确认预览后提交审查 | — | `{taskId}` |
 | GET | `/api/v1/contract/{taskId}/status` | 查询任务状态 | — | `{taskId, status, progress}` |
 | GET | `/api/v1/contract/{taskId}/report` | 获取审查报告 | — | `{taskId, summary, risks[]}` |
@@ -450,7 +452,7 @@ ReviewTask (1) ──→ (1) ReviewReport
 | GET | `/api/v1/contract/{taskId}/report/pdf` | 下载 PDF 报告（P1） | — | 文件流 |
 
 > **上传 / 提交流程**：
-> 1. `POST /upload` 解析脱敏后，创建状态为 `PENDING` 的审查任务（脱敏文本持久化至 `preview_text`），返回 `taskId` 及预览文本。此时暂不扣减配额。
+> 1. `POST /upload` 解析文本后，根据 `desensitize` 参数（默认 `true`）决定是否脱敏，创建状态为 `PENDING` 的审查任务（脱敏文本或原文持久化至 `preview_text`），返回 `taskId` 及预览文本。此时暂不扣减配额。
 > 2. `POST /{taskId}/submit` 确认后提交审查：通过 Lua 脚本原子扣减配额（判断余额 > 0 再 DECR，余额不足返回 1003）→ 投递 MQ → 消费者消费并变更状态为 `PARSING`。
 > 3. 若用户未调用 submit，后台定时任务 1 小时后自动清理该 PENDING 任务及临时数据。
 
