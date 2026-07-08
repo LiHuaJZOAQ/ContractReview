@@ -115,6 +115,12 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Apache HttpClient 5 (better SSL/timeout support) -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
