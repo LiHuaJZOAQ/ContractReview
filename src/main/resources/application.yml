@@ -12,8 +12,39 @@ spring:
 server:
   port: 8080
 
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        prefetch: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2
+          max-interval: 10000
+
+  ai:
+    vectorstore:
+      chroma:
+        host: http://localhost:8000
+
 contract:
   review:
     max-retry-count: 3
     desensitize:
       enable: true
+    law:
+      seed-enabled: true
+    rag:
+      similarity-threshold: 0.75
+      network-cache-ttl-days: 7
+      timeout-seconds:
+        parsing: 30
+        retrieving: 30
+        reviewing: 120
+        summarizing: 30
