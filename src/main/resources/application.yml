@@ -33,7 +33,14 @@ spring:
       chroma:
         host: http://localhost:8000
 
+jwt:
+  secret: ContractReviewSecretKeyForJWT2026VeryLongString
+  access-token-expiration: 7200000
+  refresh-token-expiration: 2592000000
+
 contract:
+  rate-limit:
+    max-per-minute: 30
   review:
     max-retry-count: 3
     desensitize:

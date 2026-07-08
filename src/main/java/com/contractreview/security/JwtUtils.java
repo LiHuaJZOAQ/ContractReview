@@ -55,6 +55,10 @@ public class JwtUtils {
         }
     }
 
+    public long getAccessTokenExpiration() {
+        return accessTokenExpiration;
+    }
+
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)

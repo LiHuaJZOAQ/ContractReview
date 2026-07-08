@@ -1,5 +1,6 @@
 package com.contractreview.controller;
 
+import com.contractreview.aop.AuditLog;
 import com.contractreview.common.R;
 import com.contractreview.domain.dto.AuthRequest;
 import com.contractreview.domain.dto.AuthResponse;
@@ -18,6 +19,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @AuditLog(action = "REGISTER")
     public R<AuthResponse> register(@Valid @RequestBody AuthRequest request) {
         AuthResponse response = authService.register(request.getUsername(), request.getPassword());
         return R.ok(response);

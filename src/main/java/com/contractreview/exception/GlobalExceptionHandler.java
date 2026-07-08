@@ -2,6 +2,7 @@ package com.contractreview.exception;
 
 import com.contractreview.common.BusinessException;
 import com.contractreview.common.R;
+import com.contractreview.domain.enums.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,9 @@ public class GlobalExceptionHandler {
         log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
         R<Void> r = R.error(e.getCode(), e.getMessage());
         r.setRequestId(UUID.randomUUID().toString().replace("-", ""));
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(r);
+        HttpStatus status = e.getCode() == ErrorCode.RATE_LIMITED.getCode()
+                ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(r);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

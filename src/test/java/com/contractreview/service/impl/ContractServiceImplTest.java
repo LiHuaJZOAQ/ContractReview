@@ -22,11 +22,12 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +50,11 @@ class ContractServiceImplTest {
     @Mock private UserMapper userMapper;
     @Mock private MinioClient minioClient;
     @Mock private RedisTemplate<String, Object> redisTemplate;
-    @Mock private ValueOperations<String, Object> valueOps;
+    @Mock private DefaultRedisScript<Long> quotaDeductScript;
     @Mock private RabbitTemplate rabbitTemplate;
+
+    @SuppressWarnings("unchecked")
+    private org.springframework.data.redis.core.ValueOperations<String, Object> valueOps;
 
     private ContractServiceImpl contractService;
     private final Long userId = 1L;
@@ -58,10 +62,11 @@ class ContractServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        valueOps = mock(org.springframework.data.redis.core.ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         contractService = new ContractServiceImpl(
                 objectMapper, fileUtil, taskMapper, riskItemMapper,
-                reportMapper, userMapper, minioClient, redisTemplate, rabbitTemplate);
+                reportMapper, userMapper, minioClient, redisTemplate, quotaDeductScript, rabbitTemplate);
         ReflectionTestUtils.setField(contractService, "bucket", "test-bucket");
     }
 
@@ -154,11 +159,12 @@ class ContractServiceImplTest {
     void testSubmitSuccess() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(5);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(4L);
 
         contractService.submit(taskId, userId);
 
-        verify(valueOps).decrement("user:quota:" + userId);
+        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1));
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessage.class));
     }
 
@@ -201,7 +207,9 @@ class ContractServiceImplTest {
     void testSubmitNoQuotaInRedisAndUserNotFound() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(null);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(-1L);
+        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(false);
         when(userMapper.selectById(userId)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -214,7 +222,13 @@ class ContractServiceImplTest {
     void testSubmitQuotaInsufficient() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(0);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(-1L);
+        User user = new User();
+        user.setId(userId);
+        user.setReviewQuota(0);
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(true);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.submit(taskId, userId));
