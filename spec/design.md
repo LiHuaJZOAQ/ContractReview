@@ -11,7 +11,7 @@
 构建一套基于 Multi-Agent 协作架构与 RAG 检索增强生成的智能合同风险审查系统，实现以下核心目标：
 
 - **一键审查**：用户上传合同文件，系统自动解析、脱敏、审查并生成结构化风险报告
-- **隐私保护**：上传后即时脱敏敏感信息，原始文本解析后即丢弃，仅持久化脱敏后内容
+- **隐私保护**：上传后默认即时脱敏敏感信息，原始文本解析后即丢弃，仅持久化脱敏后内容（可通过 `desensitize=false` 关闭脱敏）
 - **实时反馈**：通过 SSE 推送审查进度，让用户实时了解任务执行状态
 - **高性价比**：利用 LLM 替代传统律师咨询，大幅降低 C 端用户的法律服务门槛
 
@@ -266,7 +266,7 @@ ContractReview/
  │  上传合同文件       │                 │                 │              │               │
  ├───────────────────►│                 │                 │              │               │
  │                    │ POST /upload    │                 │              │               │
- │                    ├────────────────►│ 解析+脱敏+存储   │              │               │
+ │                    ├────────────────►│ 解析+可选脱敏+存储│              │               │
  │                    │                 ├───────────────────────────────►│               │
  │                    │                 │◄───────────────────────────────┤               │
  │ 返回预览+taskId    │                 │                 │              │               │
@@ -393,7 +393,7 @@ ContractReview/
 | POST | `/api/v1/auth/register` | 用户注册 | `{username, password}` | `{userId, token, refreshToken}` |
 | POST | `/api/v1/auth/login` | 用户登录 | `{username, password}` | `{token, refreshToken}` |
 | POST | `/api/v1/auth/refresh` | Token 刷新 | `{refreshToken}` | `{token, refreshToken}` |
-| POST | `/api/v1/contract/upload` | 上传合同文件（解析脱敏后返回预览） | MultipartFile | `{taskId, previewText}` |
+| POST | `/api/v1/contract/upload` | 上传合同文件（可选择是否脱敏，默认脱敏后返回预览） | MultipartFile + `desensitize`(boolean, query param, default true) | `{taskId, previewText}` |
 | POST | `/api/v1/contract/{taskId}/submit` | 确认预览后提交审查 | — | `{taskId}` |
 | GET | `/api/v1/contract/{taskId}/status` | 查询任务状态 | — | `{taskId, status, progress}` |
 | GET | `/api/v1/contract/{taskId}/report` | 获取审查报告 | — | `{taskId, summary, risks[]}` |
@@ -404,7 +404,7 @@ ContractReview/
 | GET | `/api/v1/contract/{taskId}/report/pdf` | 下载 PDF 报告（P1） | — | 文件流 |
 
 > **上传 / 提交流程**：
-> 1. `POST /upload` 解析脱敏后，创建状态为 `PENDING` 的审查任务（脱敏文本持久化至 `preview_text`），返回 `taskId` 及预览文本。此时暂不扣减配额。
+> 1. `POST /upload` 解析后根据 `desensitize` 参数（默认 `true`）决定是否脱敏，创建状态为 `PENDING` 的审查任务（脱敏或原始文本持久化至 `preview_text`），返回 `taskId` 及预览文本。此时暂不扣减配额。
 > 2. `POST /{taskId}/submit` 确认后提交审查：通过 Lua 脚本原子扣减配额（判断余额 > 0 再 DECR，余额不足返回 1003）→ 投递 MQ → 消费者消费并变更状态为 `PARSING`。
 > 3. 若用户未调用 submit，后台定时任务 1 小时后自动清理该 PENDING 任务及临时数据。
 
@@ -470,7 +470,7 @@ prefetch: 10 (配合 Semaphore(10) 控制 Agent B 并发)
 #### 核心审查流程（正常路径）
 
 ```
-1. 用户 POST /upload → 服务端解析 PDF → 脱敏 → 存储脱敏文本 → 返回 taskId + previewText
+1. 用户 POST /upload → 服务端解析 PDF → 可选脱敏（根据 desensitize 参数）→ 存储文本 → 返回 taskId + previewText
 2. 用户 POST /{taskId}/submit → 服务端 Lua 原子扣减配额 → 投递 MQ
 3. MQ 消费者消费消息 → 状态 PENDING → PARSING
 4. 解析阶段 → 状态 PARSING → RETRIEVING（SSE 推送 parsing 进度）
@@ -640,11 +640,12 @@ ReviewTask (1) ──→ (1) ReviewReport
 
 ```
 用户上传文件
-  → MultipartFile → Controller
+  → MultipartFile + desensitize(boolean, default true) → Controller
   → FileParser.parse() → 校验格式/大小 → 提取纯文本
-  → DesensitizationEngine.desensitize() → 敏感信息替换为 ***
-  → 脱敏文本上传 MinIO → 获取 file_url
-  → INSERT review_task (status=PENDING, preview_text=脱敏文本, file_url)
+  → 若 desensitize=true: DesensitizationEngine.desensitize() → 敏感信息替换为 ***
+  → 若 desensitize=false: 跳过脱敏，保留原始文本
+  → 处理后文本上传 MinIO → 获取 file_url
+  → INSERT review_task (status=PENDING, preview_text=处理后文本, file_url)
   → 返回 { taskId, previewText }
 ```
 

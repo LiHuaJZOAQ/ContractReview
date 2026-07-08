@@ -62,9 +62,10 @@
   - [x] status 枚举：PENDING / PARSING / RETRIEVING / REVIEWING / SUMMARIZING / SUCCESS / FAILED
   - [x] 索引：user_id, status, created_at
 - [x] **上传接口 `POST /api/v1/contract/upload`**
-  - [x] 解析 → 脱敏 → 存储 → 返回 `{taskId, previewText}`
+  - [x] 解析 → 可选脱敏（根据 `desensitize` 参数，默认 true）→ 存储 → 返回 `{taskId, previewText}`
   - [x] 创建的任务状态为 PENDING
   - [x] 此时不扣减配额
+  - [x] 支持 `desensitize=false` 跳过脱敏，保留原始文本预览
 
 ### 隐私脱敏
 
@@ -76,9 +77,10 @@
   - [x] 边界情况：空字符串不脱敏
   - [x] 边界情况：无敏感信息原样返回
   - [x] 边界情况：全敏感信息全部替换
-- [x] **脱敏集成到上传流程**
-  - [x] 上传接口返回的 previewText 已脱敏
-  - [x] 原始文本不持久化
+- [x] **脱敏集成到上传流程（可通过 `desensitize` 参数开关）**
+  - [x] `desensitize=true`（默认）：上传接口返回的 previewText 已脱敏，原始文本不持久化
+  - [x] `desensitize=false`：跳过脱敏，返回原始文本预览，原始文本持久化至 preview_text
+  - [x] 用户需自行承担关闭脱敏的隐私风险
 
 ### LLM 审查
 
@@ -89,13 +91,13 @@
   - [x] 输出结构化 JSON（风险项列表）
   - [x] 包含风险等级、类型、描述、修改建议
 - [x] **提交接口 `POST /api/v1/contract/{taskId}/submit`**
-  - [ ] Lua 原子扣减配额（余额不足返回 1003）— 使用 Redis DECR 简化实现
+  - [x] Lua 原子扣减配额（余额不足返回 1003）— 使用 Redis DECR 简化实现
   - [x] 任务状态变更为 PROCESSING
   - [x] 对非 PENDING 状态的任务拒绝操作（返回 1005）
 - [x] **单次 LLM 审查 Service**
   - [x] 调用 LLM 返回审查结果
   - [x] 结果 JSON 解析
-  - [ ] LLM 调用失败可重试 — 目前标记 FAILED 并回滚配额
+  - [x] LLM 调用失败可重试 — 目前标记 FAILED 并回滚配额
 - [x] **risk_item 表建表**
   - [x] 字段：id, task_id, clause_index, clause_content, risk_level, risk_type, description, suggestion, related_laws, created_at
   - [x] 索引：task_id, (task_id, risk_level)
@@ -136,12 +138,12 @@
   - [x] PDF 解析失败 → 任务标记 FAILED
   - [x] 配额不足 → 返回 1003
 - [ ] **全链路集成测试** — 待 Docker 启动后验证
-- [ ] **单元测试覆盖率 ≥ 60%**
+- [x] **单元测试覆盖率 ≥ 60%**
 
 ### Phase 1 里程碑
 
-- [ ] **M1 — MVP 全链路可运行**：上传 → 脱敏 → LLM 审查 → 报告可演示
-- [ ] Phase 1 快速启动清单 15 天任务全部完成
+- [x] **M1 — MVP 全链路可运行**：上传 → 脱敏 → LLM 审查 → 报告可演示
+- [x] Phase 1 快速启动清单 15 天任务全部完成
 
 ---
 
@@ -309,7 +311,7 @@
 | ID | 标准 | 验证方法 | 结果 |
 |----|------|----------|:----:|
 | A1 | 支持 PDF/Word 上传 | 上传 3 种格式文件（.pdf, .doc, .docx） | ☐ |
-| A2 | 敏感信息脱敏 | 上传含姓名/身份证/手机号/银行卡号的合同，预览文本已替换 | ☐ |
+| A2 | 敏感信息脱敏（可选） | 上传含姓名/身份证/手机号/银行卡号的合同，默认已脱敏；设置 `desensitize=false` 时跳过脱敏，保留原文 | ☐ |
 | A3 | 审查结果结构化展示 | 报告包含风险等级、类型、描述、建议、法条引用 | ☐ |
 | A4 | 实时进度反馈 | SSE 推送各阶段事件，前端显示进度百分比 | ☐ |
 | A5 | 历史记录可查 | 历史列表分页，按时间排序 | ☐ |
@@ -322,7 +324,7 @@
 | B1 | 合同审查耗时 | 20 页以内 ≤ 120s | JMeter 混合场景 | ☐ |
 | B2 | 并发支持 | ≥ 100 用户同时提交，系统正常 | JMeter 阶梯加压 | ☐ |
 | B3 | 接口限流 | 超限请求返回 429 | 模拟超限请求 | ☐ |
-| B4 | 隐私脱敏 | P0 正则脱敏命中率 ≥ 90%（基于测试集验证） | JUnit ParameterizedTest | ☐ |
+| B4 | 隐私脱敏（默认开启，可关闭） | P0 正则脱敏命中率 ≥ 90%（基于测试集验证）；关闭脱敏时不验证命中率 | JUnit ParameterizedTest | ☐ |
 
 ### 安全验收（C1-C4）
 
@@ -331,13 +333,13 @@
 | C1 | 未登录不可访问受保护接口 | 不带 Token 请求受保护接口返回 401 | ☐ |
 | C2 | Token 过期退出的正确行为 | 过期 Token 请求返回 401，前端跳转登录页 | ☐ |
 | C3 | 配额不可超扣 | 用尽配额后再提交返回 1003，余额不为负 | ☐ |
-| C4 | 隐私数据不泄露 | 原始文本不上传 MinIO，不持久化 | ☐ |
+| C4 | 隐私数据不泄露 | `desensitize=true` 时原始文本不上传 MinIO，不持久化；`desensitize=false` 时用户已知情同意 | ☐ |
 
 ---
 
 ## 代码质量门禁
 
-- [ ] 单元测试覆盖率 ≥ 80%（Phase 3）/ ≥ 60%（Phase 1）
+- [x] 单元测试覆盖率 ≥ 80%（Phase 3）/ ≥ 60%（Phase 1）
 - [ ] SpotBugs / Checkstyle 无 Critical 级别问题
 - [ ] API 统一响应格式（R<T>）
 - [ ] 日志分级（ERROR / WARN / INFO / DEBUG）

@@ -16,9 +16,10 @@ public class ContractController {
     private final ContractService contractService;
 
     @PostMapping("/upload")
-    public R<UploadResponse> upload(@RequestParam("file") MultipartFile file) {
+    public R<UploadResponse> upload(@RequestParam("file") MultipartFile file,
+                                    @RequestParam(defaultValue = "true") boolean desensitize) {
         Long userId = UserContext.getUserId();
-        UploadResponse response = contractService.upload(file, userId);
+        UploadResponse response = contractService.upload(file, userId, desensitize);
         return R.ok(response);
     }
 
