@@ -103,10 +103,10 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Spring Security Crypto (BCrypt only) -->
+        <!-- Spring Security -->
         <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
         <!-- Jackson -->
