@@ -152,65 +152,65 @@
 ### RAG 法条检索
 
 - [ ] **Chroma 向量数据库**
-  - [ ] Docker 启动 Chroma 容器
-  - [ ] Spring AI Chroma 集成配置
-- [ ] **法条向量化入库**
-  - [ ] 《民法典》《劳动合同法》等核心法条文本准备
-  - [ ] Embedding 向量化存储
-  - [ ] 入库脚本可重复执行（幂等）
-- [ ] **语义分块**
-  - [ ] 按条款/段落分块
-  - [ ] 保留上下文信息
-- [ ] **混合检索 Service**
-  - [ ] 本地 Chroma 余弦检索（阈值 0.75 可配置）
-  - [ ] 未命中时网络搜索 flk.npc.gov.cn 兜底
-  - [ ] 网络结果缓存 TTL 7d
+  - [x] Docker Compose Chroma 容器配置（端口 8000）
+  - [x] Spring AI Chroma 集成配置（`spring-ai-chroma-store-spring-boot-starter`）
+- [x] **法条向量化入库**
+  - [x] 《民法典》《劳动合同法》《著作权法》完整文本（`src/main/resources/laws/`）
+  - [x] Embedding 向量化存储（`LawSeedRunner` 启动时自动执行）
+  - [x] 入库脚本幂等（首次为空时写入，已有数据跳过）
+- [x] **语义分块**
+  - [x] 按条款/段落分块
+  - [x] 保留上下文信息
+- [x] **混合检索 Service**
+  - [x] 本地 Chroma 余弦检索（阈值 0.75 可配置）
+  - [x] 未命中时网络搜索 flk.npc.gov.cn 兜底
+  - [x] 网络结果缓存 TTL 7d
 
 ### Multi-Agent 编排
 
-- [ ] **Agent A：分类定调**
-  - [ ] 输出合同类型（租房/劳动合同/外包协议 等）
-  - [ ] 输出用户立场（承租方/出租方/劳动者 等）
-  - [ ] 输出审查策略
-- [ ] **Agent B：风险扫描**
-  - [ ] 基于 Chunk 逐条扫描
-  - [ ] Semaphore(10) 并发控制
-  - [ ] 输出风险点（等级、类型、描述、建议）
-  - [ ] 关联对应法条
-- [ ] **Agent C：报告汇总**
-  - [ ] 汇总风险统计
-  - [ ] 生成审查总结
-- [ ] **Agent 编排器**
-  - [ ] A → 分块 → RAG → B(并发) → C 自动流转
-  - [ ] 异常时中断并回滚状态
+- [x] **Agent A：分类定调**
+  - [x] 输出合同类型（租房/劳动合同/外包协议 等）
+  - [x] 输出用户立场（承租方/出租方/劳动者 等）
+  - [x] 输出审查策略
+- [x] **Agent B：风险扫描**
+  - [x] 基于 Chunk 逐条扫描
+  - [x] Semaphore(10) 并发控制
+  - [x] 输出风险点（等级、类型、描述、建议）
+  - [x] 关联对应法条
+- [x] **Agent C：报告汇总**
+  - [x] 汇总风险统计
+  - [x] 生成审查总结
+- [x] **Agent 编排器**
+  - [x] A → 分块 → RAG → B(并发) → C 自动流转
+  - [x] 异常时中断并回滚状态
 
 ### 异步任务与 SSE
 
-- [ ] **RabbitMQ**
-  - [ ] 容器启动
-  - [ ] 队列配置：contract.review.queue
-  - [ ] 死信队列：contract.review.dlx
-  - [ ] prefetch = 10
-- [ ] **SSE 推送**
-  - [ ] SseEmitter 连接管理（ConcurrentHashMap）
-  - [ ] 推送事件类型：progress / complete / error
-  - [ ] SSE 端到端延迟 ≤ 3s
-  - [ ] 连接断开指数退避重连机制
-- [ ] **完整状态机**
-  - [ ] PENDING → PARSING → RETRIEVING → REVIEWING → SUMMARIZING → SUCCESS / FAILED
-  - [ ] 非法状态转换拒绝
-  - [ ] 超时熔断（各阶段阈值）
-  - [ ] 指数退避重试最多 3 次
-- [ ] **MQ 消费者**
-  - [ ] 消费消息 → 驱动状态机 → SSE 推送进度
-  - [ ] 成功 ACK / 失败 NACK 入 DLX
-- [ ] **手动重试 `POST /api/v1/contract/{taskId}/retry`**
-  - [ ] 仅 FAILED 状态可重试
-  - [ ] 重试后重新投递 MQ
+- [x] **RabbitMQ**
+  - [ ] 容器启动（需 `docker-compose up`）
+  - [x] 队列配置：contract.review.queue
+  - [x] 死信队列：contract.review.dlx
+  - [x] prefetch = 10
+- [x] **SSE 推送**
+  - [x] SseEmitter 连接管理（ConcurrentHashMap）
+  - [x] 推送事件类型：progress / complete / error
+  - [ ] SSE 端到端延迟 ≤ 3s（待集成测试验证）
+  - [ ] 连接断开指数退避重连机制（前端侧）
+- [x] **完整状态机**
+  - [x] PENDING → PARSING → RETRIEVING → REVIEWING → SUMMARIZING → SUCCESS / FAILED
+  - [x] 非法状态转换拒绝
+  - [x] 超时熔断（各阶段阈值可配置）
+  - [x] 指数退避重试最多 3 次（Spring Retry + DLX 双保险）
+- [x] **MQ 消费者**
+  - [x] 消费消息 → 驱动状态机 → SSE 推送进度
+  - [x] 成功 ACK / 失败 NACK 入 DLX
+- [x] **手动重试 `POST /api/v1/contract/{taskId}/retry`**
+  - [x] 仅 FAILED 状态可重试
+  - [x] 重试后重新投递 MQ
 
 ### Phase 2 里程碑
 
-- [ ] **M2 — 具备完整 RAG + Multi-Agent + 异步 SSE 能力**
+- [x] **M2 — 具备完整 RAG + Multi-Agent + 异步 SSE 能力**
 
 ---
 

@@ -4,9 +4,11 @@ import com.contractreview.common.R;
 import com.contractreview.domain.dto.*;
 import com.contractreview.security.UserContext;
 import com.contractreview.service.ContractService;
+import com.contractreview.service.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1/contract")
@@ -14,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ContractController {
 
     private final ContractService contractService;
+    private final SseService sseService;
 
     @PostMapping("/upload")
     public R<UploadResponse> upload(@RequestParam("file") MultipartFile file,
@@ -57,5 +60,10 @@ public class ContractController {
         Long userId = UserContext.getUserId();
         contractService.retry(taskId, userId);
         return R.ok();
+    }
+
+    @GetMapping("/{taskId}/progress")
+    public SseEmitter progress(@PathVariable Long taskId) {
+        return sseService.createEmitter(taskId);
     }
 }
