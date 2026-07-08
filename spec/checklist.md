@@ -218,21 +218,27 @@
 
 ### 安全加固
 
-- [ ] **Spring Security 完整鉴权链**
-  - [ ] SecurityFilterChain 配置
-  - [ ] 权限路径匹配
-  - [ ] CSRF 配置
-- [ ] **Token 刷新**
-  - [ ] `POST /auth/refresh` 接口
-  - [ ] Refresh Token 30d Redis 存储
-  - [ ] Token 自动续期
-- [ ] **Redis 滑动窗口限流**
-  - [ ] Lua 脚本原子实现
-  - [ ] 超限返回错误码 1008
-- [ ] **操作审计**
-  - [ ] AOP 切面记录关键操作（注册/上传/提交/查看报告/重试）
-  - [ ] operation_log 表写入
-  - [ ] IP 地址记录
+- [x] **Spring Security 完整鉴权链**
+  - [x] SecurityFilterChain 配置（CORS、CSRF、无状态会话）
+  - [x] 权限路径匹配（`/auth/**` 放行，其余 `/api/v1/**` 认证）
+  - [x] OncePerRequestFilter JWT 校验替换 HandlerInterceptor
+- [x] **Token 刷新**
+  - [x] `POST /auth/refresh` 接口（Redis 30d 存储 + 轮换）
+  - [x] Refresh Token JWT 验证兜底（Redis 丢失时仍可用）
+  - [x] 重用检测防止重放攻击
+  - [x] `expiresIn` 字段返回 access token 有效期
+- [x] **Redis 滑动窗口限流**
+  - [x] Lua 脚本原子实现（ZREMRANGEBYSCORE + ZCARD）
+  - [x] 超限返回错误码 1008（HTTP 429）
+  - [x] 配置项 `contract.rate-limit.max-per-minute`
+- [x] **Lua 原子配额扣减**
+  - [x] 消除 TOCTOU 竞态（原 Java GET+check+DECR 改为 Lua 原子执行）
+  - [x] `quota_deduct.lua` 脚本 + `DefaultRedisScript<Long>` Bean
+- [x] **操作审计**
+  - [x] `@AuditLog` 注解 + AOP 切面
+  - [x] 记录操作：REGISTER / UPLOAD / SUBMIT / VIEW_REPORT / RETRY
+  - [x] operation_log 表写入（userId、action、taskId、detail、ipAddress）
+  - [x] IP 地址记录（X-Forwarded-For / X-Real-IP / RemoteAddr）
 
 ### 前端
 
