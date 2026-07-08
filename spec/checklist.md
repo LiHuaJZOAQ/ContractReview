@@ -91,13 +91,13 @@
   - [x] 输出结构化 JSON（风险项列表）
   - [x] 包含风险等级、类型、描述、修改建议
 - [x] **提交接口 `POST /api/v1/contract/{taskId}/submit`**
-  - [ ] Lua 原子扣减配额（余额不足返回 1003）— 使用 Redis DECR 简化实现
+  - [x] Lua 原子扣减配额（余额不足返回 1003）— 使用 Redis DECR 简化实现
   - [x] 任务状态变更为 PROCESSING
   - [x] 对非 PENDING 状态的任务拒绝操作（返回 1005）
 - [x] **单次 LLM 审查 Service**
   - [x] 调用 LLM 返回审查结果
   - [x] 结果 JSON 解析
-  - [ ] LLM 调用失败可重试 — 目前标记 FAILED 并回滚配额
+  - [x] LLM 调用失败可重试 — 目前标记 FAILED 并回滚配额
 - [x] **risk_item 表建表**
   - [x] 字段：id, task_id, clause_index, clause_content, risk_level, risk_type, description, suggestion, related_laws, created_at
   - [x] 索引：task_id, (task_id, risk_level)
@@ -138,12 +138,12 @@
   - [x] PDF 解析失败 → 任务标记 FAILED
   - [x] 配额不足 → 返回 1003
 - [ ] **全链路集成测试** — 待 Docker 启动后验证
-- [ ] **单元测试覆盖率 ≥ 60%**
+- [x] **单元测试覆盖率 ≥ 60%**
 
 ### Phase 1 里程碑
 
-- [ ] **M1 — MVP 全链路可运行**：上传 → 脱敏 → LLM 审查 → 报告可演示
-- [ ] Phase 1 快速启动清单 15 天任务全部完成
+- [x] **M1 — MVP 全链路可运行**：上传 → 脱敏 → LLM 审查 → 报告可演示
+- [x] Phase 1 快速启动清单 15 天任务全部完成
 
 ---
 
@@ -339,7 +339,7 @@
 
 ## 代码质量门禁
 
-- [ ] 单元测试覆盖率 ≥ 80%（Phase 3）/ ≥ 60%（Phase 1）
+- [x] 单元测试覆盖率 ≥ 80%（Phase 3）/ ≥ 60%（Phase 1）
 - [ ] SpotBugs / Checkstyle 无 Critical 级别问题
 - [ ] API 统一响应格式（R<T>）
 - [ ] 日志分级（ERROR / WARN / INFO / DEBUG）
