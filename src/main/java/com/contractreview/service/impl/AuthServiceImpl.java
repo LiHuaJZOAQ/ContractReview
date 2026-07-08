@@ -48,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         redisTemplate.opsForValue().set("refresh:token:" + refreshToken, user.getId().toString(), 30, TimeUnit.DAYS);
 
-        return new AuthResponse(user.getId(), token, refreshToken);
+        return buildAuthResponse(user.getId(), token, refreshToken);
     }
 
     @Override
@@ -64,23 +64,41 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         redisTemplate.opsForValue().set("refresh:token:" + refreshToken, user.getId().toString(), 30, TimeUnit.DAYS);
 
-        return new AuthResponse(user.getId(), token, refreshToken);
+        return buildAuthResponse(user.getId(), token, refreshToken);
     }
 
     @Override
     public AuthResponse refresh(String refreshToken) {
         String key = "refresh:token:" + refreshToken;
         String userIdStr = (String) redisTemplate.opsForValue().get(key);
+
         if (userIdStr == null) {
+            if (jwtUtils.validateToken(refreshToken)) {
+                Long userId = jwtUtils.getUserIdFromToken(refreshToken);
+                String reuseKey = "refresh:reuse:" + userId;
+                Boolean firstReuse = redisTemplate.opsForValue().setIfAbsent(reuseKey, "1", 30, TimeUnit.DAYS);
+                if (Boolean.TRUE.equals(firstReuse)) {
+                    log.warn("Refresh Token 已使用但 Redis 记录丢失，user={}，重新签发", userId);
+                    String newToken = jwtUtils.generateAccessToken(userId);
+                    String newRefreshToken = jwtUtils.generateRefreshToken(userId);
+                    redisTemplate.opsForValue().set("refresh:token:" + newRefreshToken, userId.toString(), 30, TimeUnit.DAYS);
+                    return buildAuthResponse(userId, newToken, newRefreshToken);
+                }
+                log.warn("疑似 Refresh Token 重用攻击，user={}", userId);
+            }
             throw new BusinessException(401, "Refresh Token 无效或已过期");
         }
-        redisTemplate.delete(key);
 
+        redisTemplate.delete(key);
         Long userId = Long.valueOf(userIdStr);
         String newToken = jwtUtils.generateAccessToken(userId);
         String newRefreshToken = jwtUtils.generateRefreshToken(userId);
         redisTemplate.opsForValue().set("refresh:token:" + newRefreshToken, userId.toString(), 30, TimeUnit.DAYS);
 
-        return new AuthResponse(userId, newToken, newRefreshToken);
+        return buildAuthResponse(userId, newToken, newRefreshToken);
+    }
+
+    private AuthResponse buildAuthResponse(Long userId, String token, String refreshToken) {
+        return new AuthResponse(userId, token, refreshToken, jwtUtils.getAccessTokenExpiration() / 1000);
     }
 }

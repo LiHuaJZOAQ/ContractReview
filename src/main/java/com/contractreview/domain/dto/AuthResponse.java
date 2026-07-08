@@ -9,4 +9,5 @@ public class AuthResponse {
     private Long userId;
     private String token;
     private String refreshToken;
+    private long expiresIn;
 }
