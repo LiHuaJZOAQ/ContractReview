@@ -3,6 +3,7 @@ package com.contractreview.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.contractreview.common.BusinessException;
+import com.contractreview.config.RabbitMqConfig;
 import com.contractreview.domain.dto.*;
 import com.contractreview.domain.entity.ReviewReport;
 import com.contractreview.domain.entity.ReviewTask;
@@ -22,9 +23,9 @@ import io.minio.MakeBucketArgs;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -48,7 +49,7 @@ public class ContractServiceImpl implements ContractService {
     private final UserMapper userMapper;
     private final MinioClient minioClient;
     private final RedisTemplate<String, Object> redisTemplate;
-    private final LLMReviewService llmReviewService;
+    private final RabbitTemplate rabbitTemplate;
 
     @Value("${minio.bucket}")
     private String bucket;
@@ -133,52 +134,10 @@ public class ContractServiceImpl implements ContractService {
         }
         redisTemplate.opsForValue().decrement(quotaKey);
 
-        task.setStatus("PROCESSING");
-        task.setProgress(5);
-        taskMapper.updateById(task);
-
-        startReviewAsync(taskId, userId);
-    }
-
-    @Async("taskExecutor")
-    public void startReviewAsync(Long taskId, Long userId) {
-        try {
-            ReviewTask task = taskMapper.selectById(taskId);
-            task.setProgress(30);
-            taskMapper.updateById(task);
-
-            String text = task.getPreviewText();
-            String result = llmReviewService.reviewContract(text);
-
-            task.setProgress(70);
-            taskMapper.updateById(task);
-
-            saveReviewResult(taskId, result);
-
-            task.setStatus("SUCCESS");
-            task.setProgress(100);
-            task.setCompletedAt(LocalDateTime.now());
-            taskMapper.updateById(task);
-        } catch (Exception e) {
-            log.error("Review failed for task {}: {}", taskId, e.getMessage());
-            ReviewTask task = taskMapper.selectById(taskId);
-            if (task != null) {
-                task.setStatus("FAILED");
-                task.setProgress(-1);
-                task.setErrorMsg(e.getMessage());
-                task.setCompletedAt(LocalDateTime.now());
-                taskMapper.updateById(task);
-
-                String quotaKey = "user:quota:" + userId;
-                redisTemplate.opsForValue().increment(quotaKey);
-
-                User user = userMapper.selectById(userId);
-                if (user != null) {
-                    user.setReviewQuota(user.getReviewQuota() + 1);
-                    userMapper.updateById(user);
-                }
-            }
-        }
+        ReviewMessage message = new ReviewMessage(taskId, userId, 0);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,
+                RabbitMqConfig.ROUTING_KEY, message);
+        log.info("Sent review message to MQ: taskId={}, userId={}", taskId, userId);
     }
 
     @SuppressWarnings("unchecked")
@@ -332,5 +291,10 @@ public class ContractServiceImpl implements ContractService {
         task.setErrorMsg(null);
         task.setCompletedAt(null);
         taskMapper.updateById(task);
+
+        ReviewMessage message = new ReviewMessage(taskId, userId, 0);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,
+                RabbitMqConfig.ROUTING_KEY, message);
+        log.info("Re-queued task {} via retry", taskId);
     }
 }

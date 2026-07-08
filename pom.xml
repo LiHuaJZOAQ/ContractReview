@@ -115,6 +115,26 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Spring AI Chroma / VectorStore -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-chroma-store-spring-boot-starter</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
+        <!-- Spring AMQP / RabbitMQ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- jsoup (for HTML parsing in law search fallback) -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+
         <!-- Apache HttpClient 5 (better SSL/timeout support) -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>

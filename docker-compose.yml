@@ -33,6 +33,31 @@ services:
     volumes:
       - minio-data:/data
 
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: contract-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: contract-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
 volumes:
   mysql-data:
   minio-data:
+  chroma-data:
+  rabbitmq-data:
