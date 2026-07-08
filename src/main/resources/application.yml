@@ -39,6 +39,8 @@ jwt:
   refresh-token-expiration: 2592000000
 
 contract:
+  rate-limit:
+    max-per-minute: 30
   review:
     max-retry-count: 3
     desensitize:

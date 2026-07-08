@@ -26,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,6 +50,7 @@ public class ContractServiceImpl implements ContractService {
     private final UserMapper userMapper;
     private final MinioClient minioClient;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final DefaultRedisScript<Long> quotaDeductScript;
     private final RabbitTemplate rabbitTemplate;
 
     @Value("${minio.bucket}")
@@ -120,19 +122,20 @@ public class ContractServiceImpl implements ContractService {
         }
 
         String quotaKey = "user:quota:" + userId;
-        Integer quota = (Integer) redisTemplate.opsForValue().get(quotaKey);
-        if (quota == null) {
+        Long newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
+        if (newQuota == null || newQuota < 0) {
             User user = userMapper.selectById(userId);
             if (user == null) {
                 throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
             }
-            quota = user.getReviewQuota();
-            redisTemplate.opsForValue().set(quotaKey, quota);
+            if (!redisTemplate.hasKey(quotaKey)) {
+                redisTemplate.opsForValue().set(quotaKey, user.getReviewQuota());
+                newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
+            }
+            if (newQuota == null || newQuota < 0) {
+                throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
+            }
         }
-        if (quota <= 0) {
-            throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
-        }
-        redisTemplate.opsForValue().decrement(quotaKey);
 
         ReviewMessage message = new ReviewMessage(taskId, userId, 0);
         rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,

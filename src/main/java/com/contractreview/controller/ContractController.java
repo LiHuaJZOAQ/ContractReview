@@ -1,5 +1,6 @@
 package com.contractreview.controller;
 
+import com.contractreview.aop.AuditLog;
 import com.contractreview.common.R;
 import com.contractreview.domain.dto.*;
 import com.contractreview.security.UserContext;
@@ -19,6 +20,7 @@ public class ContractController {
     private final SseService sseService;
 
     @PostMapping("/upload")
+    @AuditLog(action = "UPLOAD")
     public R<UploadResponse> upload(@RequestParam("file") MultipartFile file,
                                     @RequestParam(defaultValue = "true") boolean desensitize) {
         Long userId = UserContext.getUserId();
@@ -27,6 +29,7 @@ public class ContractController {
     }
 
     @PostMapping("/{taskId}/submit")
+    @AuditLog(action = "SUBMIT")
     public R<Void> submit(@PathVariable Long taskId) {
         Long userId = UserContext.getUserId();
         contractService.submit(taskId, userId);
@@ -41,6 +44,7 @@ public class ContractController {
     }
 
     @GetMapping("/{taskId}/report")
+    @AuditLog(action = "VIEW_REPORT")
     public R<ReportResponse> getReport(@PathVariable Long taskId) {
         Long userId = UserContext.getUserId();
         ReportResponse response = contractService.getReport(taskId, userId);
@@ -56,6 +60,7 @@ public class ContractController {
     }
 
     @PostMapping("/{taskId}/retry")
+    @AuditLog(action = "RETRY")
     public R<Void> retry(@PathVariable Long taskId) {
         Long userId = UserContext.getUserId();
         contractService.retry(taskId, userId);
