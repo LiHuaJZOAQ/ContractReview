@@ -31,6 +31,11 @@ public class SseServiceImpl implements SseService {
     }
 
     @Override
+    public void sendLlmOutput(Long taskId, String agent, String content) {
+        send(taskId, "llm_output", Map.of("agent", agent, "content", content, "timestamp", System.currentTimeMillis()));
+    }
+
+    @Override
     public void sendComplete(Long taskId, String reportId) {
         send(taskId, "complete", Map.of("status", "completed", "progress", 100, "message", "审查完成", "reportId", reportId));
     }

@@ -105,8 +105,9 @@ public class ReviewMessageListener {
                 }
 
                 stateMachine.transition(taskId, task.getStatus(), "FAILED");
-                task.setErrorMsg("重试次数已达上限 (" + maxRetryCount + " 次)");
-                taskMapper.updateById(task);
+                ReviewTask failedTask = taskMapper.selectById(taskId);
+                failedTask.setErrorMsg("重试次数已达上限 (" + maxRetryCount + " 次)");
+                taskMapper.updateById(failedTask);
 
                 String quotaKey = "user:quota:" + task.getUserId();
                 redisTemplate.opsForValue().increment(quotaKey);
@@ -136,9 +137,10 @@ public class ReviewMessageListener {
             stateMachine.transition(taskId, "SUMMARIZING", "SUCCESS");
             saveReviewResult(taskId, result);
 
-            task.setContractType((String) result.getOrDefault("contractType", null));
-            task.setUserStance((String) result.getOrDefault("userStance", null));
-            taskMapper.updateById(task);
+            ReviewTask updatedTask = taskMapper.selectById(taskId);
+            updatedTask.setContractType((String) result.getOrDefault("contractType", null));
+            updatedTask.setUserStance((String) result.getOrDefault("userStance", null));
+            taskMapper.updateById(updatedTask);
 
             sseService.sendComplete(taskId, taskId.toString());
             log.info("Review completed successfully for task {}", taskId);
@@ -158,8 +160,9 @@ public class ReviewMessageListener {
             String currentStatus = task.getStatus();
             stateMachine.transition(taskId, currentStatus, "FAILED");
 
-            task.setErrorMsg(throwable.getMessage());
-            taskMapper.updateById(task);
+            ReviewTask failedTask = taskMapper.selectById(taskId);
+            failedTask.setErrorMsg(throwable.getMessage());
+            taskMapper.updateById(failedTask);
 
             sseService.sendError(taskId, "审查失败: " + throwable.getMessage());
 
@@ -182,17 +185,6 @@ public class ReviewMessageListener {
     private void saveReviewResult(Long taskId, Map<String, Object> result) {
         String summary = (String) result.getOrDefault("summary", "");
 
-        Map<String, Integer> riskCount;
-        Object rc = result.get("riskCount");
-        if (rc instanceof Map) {
-            riskCount = (Map<String, Integer>) rc;
-        } else {
-            riskCount = new HashMap<>();
-            riskCount.put("high", 0);
-            riskCount.put("medium", 0);
-            riskCount.put("low", 0);
-        }
-
         List<Map<String, Object>> risks;
         Object r = result.get("risks");
         if (r instanceof List) {
@@ -201,6 +193,7 @@ public class ReviewMessageListener {
             risks = List.of();
         }
 
+        int high = 0, medium = 0, low = 0;
         for (Map<String, Object> riskMap : risks) {
             RiskItem item = new RiskItem();
             item.setTaskId(taskId);
@@ -219,14 +212,21 @@ public class ReviewMessageListener {
                 }
             }
             riskItemMapper.insert(item);
+
+            String level = ((String) riskMap.getOrDefault("riskLevel", "LOW")).toUpperCase();
+            switch (level) {
+                case "HIGH": high++; break;
+                case "MEDIUM": medium++; break;
+                default: low++;
+            }
         }
 
         ReviewReport report = new ReviewReport();
         report.setTaskId(taskId);
         report.setSummary(summary);
-        report.setRiskCountHigh(riskCount.getOrDefault("high", 0));
-        report.setRiskCountMedium(riskCount.getOrDefault("medium", 0));
-        report.setRiskCountLow(riskCount.getOrDefault("low", 0));
+        report.setRiskCountHigh(high);
+        report.setRiskCountMedium(medium);
+        report.setRiskCountLow(low);
         try {
             report.setReportJson(objectMapper.writeValueAsString(result));
         } catch (Exception e) {

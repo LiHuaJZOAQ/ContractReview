@@ -47,6 +47,8 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             String userStance = classification.getOrDefault("userStance", "其他");
             String strategy = classification.getOrDefault("reviewStrategy", "标准审查");
             log.info("Agent A classified: type={}, stance={}", contractType, userStance);
+            sseService.sendLlmOutput(taskId, "Agent-A 合同分类",
+                    "合同类型: " + contractType + "\n立场: " + userStance + "\n策略: " + strategy);
             stateMachine.transition(taskId, "PARSING", "RETRIEVING");
 
             sseService.sendProgress(taskId, "retrieving", 30, "正在检索相关法条...");
@@ -70,7 +72,17 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                                     "正在审查第 " + (index + 1) + "/" + totalChunks + " 条...");
                             log.info("Agent B scanning chunk {}/{}", index + 1, totalChunks);
                             List<String> laws = ragService.retrieveRelevantLaws(chunk);
-                            return agentService.scanRisks(chunk, laws, strategy);
+                            List<Map<String, Object>> risks = agentService.scanRisks(chunk, laws, strategy);
+                            if (!risks.isEmpty()) {
+                                String output = "第" + (index + 1) + "条发现 " + risks.size() + " 个风险:\n";
+                                for (Map<String, Object> r : risks) {
+                                    output += "  [" + r.getOrDefault("riskLevel", "LOW") + "] "
+                                            + r.getOrDefault("description", "").toString().substring(0, Math.min(80,
+                                                    r.getOrDefault("description", "").toString().length())) + "\n";
+                                }
+                                sseService.sendLlmOutput(taskId, "Agent-B 条款审查", output);
+                            }
+                            return risks;
                         } finally {
                             semaphore.release();
                         }
@@ -101,6 +113,9 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             sseService.sendProgress(taskId, "summarizing", 90, "正在生成审查报告...");
             Map<String, Object> report = agentService.summarizeReport(allRisks, contractType);
             report.put("userStance", userStance);
+            String summary = (String) report.getOrDefault("summary", "");
+            sseService.sendLlmOutput(taskId, "Agent-C 汇总报告",
+                    summary.length() > 500 ? summary.substring(0, 500) + "..." : summary);
 
             sseService.sendProgress(taskId, "completed", 100, "审查完成");
             return CompletableFuture.completedFuture(report);

@@ -152,22 +152,10 @@ public class ContractServiceImpl implements ContractService {
             log.warn("LLM result may not be valid JSON, storing raw: {}", e.getMessage());
             result = new HashMap<>();
             result.put("summary", llmResult);
-            result.put("riskCount", Map.of("high", 0, "medium", 0, "low", 0));
             result.put("risks", List.of());
         }
 
         String summary = (String) result.getOrDefault("summary", "");
-
-        Map<String, Integer> riskCount;
-        Object rc = result.get("riskCount");
-        if (rc instanceof Map) {
-            riskCount = (Map<String, Integer>) rc;
-        } else {
-            riskCount = new HashMap<>();
-            riskCount.put("high", 0);
-            riskCount.put("medium", 0);
-            riskCount.put("low", 0);
-        }
 
         List<Map<String, Object>> risks;
         Object r = result.get("risks");
@@ -177,6 +165,7 @@ public class ContractServiceImpl implements ContractService {
             risks = List.of();
         }
 
+        int high = 0, medium = 0, low = 0;
         for (Map<String, Object> riskMap : risks) {
             RiskItem item = new RiskItem();
             item.setTaskId(taskId);
@@ -195,14 +184,21 @@ public class ContractServiceImpl implements ContractService {
                 }
             }
             riskItemMapper.insert(item);
+
+            String level = ((String) riskMap.getOrDefault("riskLevel", "LOW")).toUpperCase();
+            switch (level) {
+                case "HIGH": high++; break;
+                case "MEDIUM": medium++; break;
+                default: low++;
+            }
         }
 
         ReviewReport report = new ReviewReport();
         report.setTaskId(taskId);
         report.setSummary(summary);
-        report.setRiskCountHigh(riskCount.getOrDefault("high", 0));
-        report.setRiskCountMedium(riskCount.getOrDefault("medium", 0));
-        report.setRiskCountLow(riskCount.getOrDefault("low", 0));
+        report.setRiskCountHigh(high);
+        report.setRiskCountMedium(medium);
+        report.setRiskCountLow(low);
         try {
             report.setReportJson(objectMapper.writeValueAsString(result));
         } catch (Exception e) {
