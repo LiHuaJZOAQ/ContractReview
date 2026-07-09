@@ -35,12 +35,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="progressVisible" title="审查进度" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
-      <div style="text-align:center;padding:20px">
-        <el-progress type="circle" :percentage="progress" :status="progressStatus" />
-        <p style="margin-top:16px">{{ progressText }}</p>
-      </div>
-    </el-dialog>
+    <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" />
   </div>
 </template>
 
@@ -50,19 +45,16 @@ import { useRouter } from 'vue-router'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uploadFile, submitTask } from '@/api/contract'
+import SseProgress from '@/components/SseProgress.vue'
 
 const router = useRouter()
 const uploadRef = ref(null)
+const sseRef = ref(null)
 const desensitize = ref(true)
 const previewText = ref('')
 const currentTaskId = ref(null)
 const selectedFile = ref(null)
 const submitting = ref(false)
-
-const progressVisible = ref(false)
-const progress = ref(0)
-const progressStatus = ref('')
-const progressText = ref('')
 
 function handleFileChange(file) {
   selectedFile.value = file.raw
@@ -83,48 +75,16 @@ async function handleSubmit() {
 
     await submitTask(res.taskId)
     ElMessage.success('提交成功，开始审查')
-
-    progressVisible.value = true
-    startSSE(res.taskId)
+    sseRef.value.open()
   } catch {
-    submitting.value = false
+    // error handled by interceptor
   } finally {
     submitting.value = false
   }
 }
 
-function startSSE(taskId) {
-  const token = localStorage.getItem('token')
-  const source = new EventSource(`/api/v1/contract/${taskId}/progress?token=${token}`)
-
-  source.addEventListener('progress', e => {
-    const data = JSON.parse(e.data)
-    progress.value = data.progress
-    progressText.value = data.message || '处理中...'
-    progressStatus.value = ''
-  })
-
-  source.addEventListener('complete', e => {
-    progress.value = 100
-    progressText.value = '审查完成'
-    progressStatus.value = 'success'
-    source.close()
-    setTimeout(() => {
-      progressVisible.value = false
-      router.push(`/report/${taskId}`)
-    }, 1500)
-  })
-
-  source.addEventListener('error', e => {
-    const data = JSON.parse(e.data)
-    progressStatus.value = 'exception'
-    progressText.value = data.message || '审查失败'
-    source.close()
-  })
-
-  source.onerror = () => {
-    source.close()
-  }
+function onComplete() {
+  setTimeout(() => router.push(`/report/${currentTaskId.value}`), 1000)
 }
 </script>
 
