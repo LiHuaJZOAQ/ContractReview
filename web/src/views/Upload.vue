@@ -27,6 +27,14 @@
         style="margin: 16px 0"
       />
 
+      <el-button
+        v-if="selectedFile && !previewText"
+        type="primary"
+        :loading="uploading"
+        style="margin-top:16px"
+        @click="handleUpload"
+      >上传预览</el-button>
+
       <div v-if="previewText" class="preview-section">
         <el-divider />
         <h3>文本预览</h3>
@@ -54,6 +62,7 @@ const desensitize = ref(true)
 const previewText = ref('')
 const currentTaskId = ref(null)
 const selectedFile = ref(null)
+const uploading = ref(false)
 const submitting = ref(false)
 
 function handleFileChange(file) {
@@ -62,18 +71,25 @@ function handleFileChange(file) {
   currentTaskId.value = null
 }
 
-async function handleSubmit() {
-  if (!selectedFile.value) {
-    ElMessage.warning('请先选择文件')
-    return
-  }
-  submitting.value = true
+async function handleUpload() {
+  if (!selectedFile.value) return
+  uploading.value = true
   try {
     const res = await uploadFile(selectedFile.value, desensitize.value)
     previewText.value = res.previewText
     currentTaskId.value = res.taskId
+  } catch {
+    // error handled by interceptor
+  } finally {
+    uploading.value = false
+  }
+}
 
-    await submitTask(res.taskId)
+async function handleSubmit() {
+  if (!currentTaskId.value) return
+  submitting.value = true
+  try {
+    await submitTask(currentTaskId.value)
     ElMessage.success('提交成功，开始审查')
     sseRef.value.open()
   } catch {
