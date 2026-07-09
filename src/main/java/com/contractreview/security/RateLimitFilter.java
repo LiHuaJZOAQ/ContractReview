@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,11 +20,11 @@ import java.util.List;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final DefaultRedisScript<Long> rateLimitScript;
     private final int maxRequestsPerMinute;
 
-    public RateLimitFilter(RedisTemplate<String, Object> redisTemplate,
+    public RateLimitFilter(StringRedisTemplate redisTemplate,
                            @Value("${contract.rate-limit.max-per-minute:30}") int maxRequestsPerMinute) {
         this.redisTemplate = redisTemplate;
         this.rateLimitScript = new DefaultRedisScript<>();
