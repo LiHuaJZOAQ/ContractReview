@@ -3,6 +3,7 @@ package com.contractreview.service.impl;
 import com.contractreview.service.AgentOrchestrator;
 import com.contractreview.service.AgentService;
 import com.contractreview.service.RagService;
+import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.contractreview.util.ChunkingUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
 
     private final AgentService agentService;
     private final RagService ragService;
+    private final ReviewStateMachine stateMachine;
 
     private final Semaphore semaphore = new Semaphore(10);
 
@@ -45,11 +47,14 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             String userStance = classification.getOrDefault("userStance", "其他");
             String strategy = classification.getOrDefault("reviewStrategy", "标准审查");
             log.info("Agent A classified: type={}, stance={}", contractType, userStance);
+            stateMachine.transition(taskId, "PARSING", "RETRIEVING");
 
             sseService.sendProgress(taskId, "retrieving", 30, "正在检索相关法条...");
             List<String> chunks = ChunkingUtil.chunkByClause(fullText);
             final List<String> finalChunks = chunks.isEmpty() ? ChunkingUtil.chunkByLength(fullText) : chunks;
             log.info("Chunked into {} parts", finalChunks.size());
+
+            stateMachine.transition(taskId, "RETRIEVING", "REVIEWING");
 
             final int totalChunks = finalChunks.size();
             List<CompletableFuture<List<Map<String, Object>>>> futures = new ArrayList<>();
@@ -91,6 +96,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                     .collect(Collectors.toList());
 
             log.info("Agent B completed, total risks: {}", allRisks.size());
+            stateMachine.transition(taskId, "REVIEWING", "SUMMARIZING");
 
             sseService.sendProgress(taskId, "summarizing", 90, "正在生成审查报告...");
             Map<String, Object> report = agentService.summarizeReport(allRisks, contractType);
