@@ -47,6 +47,7 @@
     </el-card>
 
     <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" @error="onError" />
+    <p v-if="submitting" class="submit-hint">正在提交审查请求，请稍候...</p>
   </div>
 </template>
 
@@ -93,12 +94,11 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await submitTask(currentTaskId.value)
-    ElMessage.success('提交成功，开始审查')
+    submitting.value = false
     sseRef.value.open()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '提交失败')
-  } finally {
     submitting.value = false
+    ElMessage.error(e?.response?.data?.message || '提交失败')
   }
 }
 
@@ -123,5 +123,10 @@ function onError(msg) {
 }
 .preview-section {
   margin-top: 16px;
+}
+.submit-hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #909399;
 }
 </style>
