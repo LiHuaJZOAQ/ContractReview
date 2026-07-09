@@ -28,7 +28,7 @@
       />
 
       <el-button
-        v-if="selectedFile && !previewText"
+        v-if="selectedFile"
         type="primary"
         :loading="uploading"
         style="margin-top:16px"
@@ -39,11 +39,14 @@
         <el-divider />
         <h3>文本预览</h3>
         <el-input v-model="previewText" type="textarea" :rows="8" readonly />
-        <el-button type="primary" :loading="submitting" style="margin-top:16px" @click="handleSubmit">提交审查</el-button>
+        <div style="margin-top:16px; display:flex; gap:12px">
+          <el-button @click="handleBack">返回</el-button>
+          <el-button type="primary" :loading="submitting" @click="handleSubmit">提交审查</el-button>
+        </div>
       </div>
     </el-card>
 
-    <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" />
+    <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" @error="onError" />
   </div>
 </template>
 
@@ -78,8 +81,8 @@ async function handleUpload() {
     const res = await uploadFile(selectedFile.value, desensitize.value)
     previewText.value = res.previewText
     currentTaskId.value = res.taskId
-  } catch {
-    // error handled by interceptor
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '上传失败')
   } finally {
     uploading.value = false
   }
@@ -92,15 +95,24 @@ async function handleSubmit() {
     await submitTask(currentTaskId.value)
     ElMessage.success('提交成功，开始审查')
     sseRef.value.open()
-  } catch {
-    // error handled by interceptor
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '提交失败')
   } finally {
     submitting.value = false
   }
 }
 
+function handleBack() {
+  previewText.value = ''
+  currentTaskId.value = null
+}
+
 function onComplete() {
   setTimeout(() => router.push(`/report/${currentTaskId.value}`), 1000)
+}
+
+function onError(msg) {
+  ElMessage.error(msg)
 }
 </script>
 
