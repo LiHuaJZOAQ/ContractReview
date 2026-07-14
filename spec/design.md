@@ -341,14 +341,11 @@ ContractReview/
 
 | 属性 | 说明 |
 |------|------|
-| **职责** | 根据合同条款检索相关法律法规；使用 LLM 替代 Chroma 向量库 |
+| **职责** | 根据合同条款检索相关法律法规；Chroma 向量库为主，LLM 检索为兜底 |
 | **接口** | `List<String> retrieveRelevantLaws(String chunkContent)` |
-| **内部流程** | 直接调用 LLM（Prompt 要求输出相关法条）→ Redis 缓存结果（TTL 7d） |
+| **内部流程** | Chroma 余弦检索（阈值 0.75, TopK=3）→ 命中则缓存 Redis(1d) → 未命中/Embedding 不可用则 LLM 检索 → 缓存 Redis(7d) |
 
-> **注意**：原设计使用 Chroma 向量库 + flk.npc.gov.cn 网络搜索兜底，但由于：
-> - opencode LLM 供应商不支持 `/v1/embeddings`（Chroma 依赖 Embedding API 返回 404）
-> - flk.npc.gov.cn 拒绝自动化请求（HTTP 493）
-> 已改用 LLM chat 直接检索。LLM 训练数据已包含《民法典》《劳动合同法》等主要中国法律法规，效果等效。Redis 缓存减少重复调用。未来可切换为支持 Embedding 的供应商后恢复 Chroma。|
+> **降级说明**：Embedding API（由 LLM 供应商提供）不可用时 Chroma 抛异常，自动降级到 LLM chat 直接检索法条。flk.npc.gov.cn 网络搜索（遭 493 反爬）已移除。Redis 缓存减少重复调用。未来切换为支持 Embedding 的供应商后 Chroma 自动恢复。|
 
 #### 6. AgentOrchestrator — Agent 编排器
 

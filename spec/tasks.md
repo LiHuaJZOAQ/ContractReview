@@ -415,8 +415,8 @@ graph TD
 | Chroma 向量库首次构建耗时 | 延迟 Phase 2 启动 | Phase 1 提前准备法条数据 + 入库脚本 |
 | 脱敏正则误匹配 | 用户隐私泄露风险 | P0 正则 + P1 NLP 增强渐进；验收标准要求 ≥ 90% 命中率 |
 | 大合同（> 50 页）审查超阈值 | 总耗时 > 5min 触发熔断 | Map-Reduce 分片处理，超时熔断后支持手动重试 |
-| ~~Chroma Embedding 404~~ | opencode 供应商不支持 `/v1/embeddings` | **已修复**：改用 LLM chat 直接检索相关法条，移除 Chroma 依赖 |
-| ~~flk.npc.gov.cn 反爬~~ | 法规数据库拒绝自动化请求（HTTP 493） | **已修复**：移除 Jsoup 爬取，统一使用 LLM 法律知识检索 |
+| Chroma Embedding 404 | opencode 供应商不支持 `/v1/embeddings` | **已修复**：Chroma 保持为主路径，Embedding 异常时自动降级到 LLM 检索（双路径设计） |
+| flk.npc.gov.cn 反爬 | 法规数据库拒绝自动化请求（HTTP 493） | **已修复**：移除 Jsoup 爬取，网络兜底替换为 LLM 检索 |
 
 ### 假设条件
 
