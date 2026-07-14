@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/contract")
 @RequiredArgsConstructor
@@ -51,11 +53,12 @@ public class ContractController {
         return R.ok(response);
     }
 
-    @GetMapping("/history")
+    @GetMapping({"/history", "/history/{status}"})
     public R<HistoryResponse> getHistory(@RequestParam(defaultValue = "1") int page,
-                                          @RequestParam(defaultValue = "10") int size) {
+                                          @RequestParam(defaultValue = "10") int size,
+                                          @PathVariable(required = false) String status) {
         Long userId = UserContext.getUserId();
-        HistoryResponse response = contractService.getHistory(userId, page, size);
+        HistoryResponse response = contractService.getHistory(userId, page, size, status);
         return R.ok(response);
     }
 
@@ -70,5 +73,19 @@ public class ContractController {
     @GetMapping("/{taskId}/progress")
     public SseEmitter progress(@PathVariable Long taskId) {
         return sseService.createEmitter(taskId);
+    }
+
+    @GetMapping("/{taskId}/text")
+    public R<String> getPreviewText(@PathVariable Long taskId) {
+        Long userId = UserContext.getUserId();
+        String text = contractService.getPreviewText(taskId, userId);
+        return R.ok(text);
+    }
+
+    @GetMapping("/{taskId}/logs")
+    public R<List<ContractService.ReviewProcessLogDto>> getProcessLogs(@PathVariable Long taskId) {
+        Long userId = UserContext.getUserId();
+        List<ContractService.ReviewProcessLogDto> logs = contractService.getProcessLogs(taskId, userId);
+        return R.ok(logs);
     }
 }

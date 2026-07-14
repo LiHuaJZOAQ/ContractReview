@@ -10,6 +10,7 @@ import com.contractreview.domain.entity.ReviewTask;
 import com.contractreview.domain.entity.RiskItem;
 import com.contractreview.domain.entity.User;
 import com.contractreview.domain.enums.ErrorCode;
+import com.contractreview.domain.entity.ReviewProcessLog;
 import com.contractreview.mapper.*;
 import com.contractreview.service.ContractService;
 import com.contractreview.util.DesensitizationUtil;
@@ -48,6 +49,7 @@ public class ContractServiceImpl implements ContractService {
     private final RiskItemMapper riskItemMapper;
     private final ReviewReportMapper reportMapper;
     private final UserMapper userMapper;
+    private final ReviewProcessLogMapper processLogMapper;
     private final MinioClient minioClient;
     private final RedisTemplate<String, Object> redisTemplate;
     private final DefaultRedisScript<Long> quotaDeductScript;
@@ -257,12 +259,19 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
-    public HistoryResponse getHistory(Long userId, int page, int size) {
+    public HistoryResponse getHistory(Long userId, int page, int size, String status) {
         Page<ReviewTask> pageObj = new Page<>(page, size);
-        Page<ReviewTask> result = taskMapper.selectPage(pageObj,
-                new LambdaQueryWrapper<ReviewTask>()
-                        .eq(ReviewTask::getUserId, userId)
-                        .orderByDesc(ReviewTask::getCreatedAt));
+        LambdaQueryWrapper<ReviewTask> wrapper = new LambdaQueryWrapper<ReviewTask>()
+                .eq(ReviewTask::getUserId, userId);
+        if (status != null && !status.isEmpty() && !"ALL".equals(status)) {
+            String[] statuses = status.split(",");
+            if (statuses.length == 1) {
+                wrapper.eq(ReviewTask::getStatus, statuses[0]);
+            } else {
+                wrapper.in(ReviewTask::getStatus, (Object[]) statuses);
+            }
+        }
+        Page<ReviewTask> result = taskMapper.selectPage(pageObj, wrapper.orderByDesc(ReviewTask::getCreatedAt));
 
         List<HistoryResponse.HistoryItem> items = result.getRecords().stream()
                 .map(t -> new HistoryResponse.HistoryItem(
@@ -272,6 +281,32 @@ public class ContractServiceImpl implements ContractService {
                 .collect(Collectors.toList());
 
         return new HistoryResponse(items, result.getTotal(), page, size);
+    }
+
+    @Override
+    public String getPreviewText(Long taskId, Long userId) {
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        return task.getPreviewText();
+    }
+
+    @Override
+    public List<ContractService.ReviewProcessLogDto> getProcessLogs(Long taskId, Long userId) {
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        List<ReviewProcessLog> logs = processLogMapper.selectList(
+                new LambdaQueryWrapper<ReviewProcessLog>()
+                        .eq(ReviewProcessLog::getTaskId, taskId)
+                        .orderByAsc(ReviewProcessLog::getCreatedAt));
+        return logs.stream()
+                .map(l -> new ContractService.ReviewProcessLogDto(
+                        l.getAgent(), l.getContent(),
+                        l.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
+                .collect(Collectors.toList());
     }
 
     @Override

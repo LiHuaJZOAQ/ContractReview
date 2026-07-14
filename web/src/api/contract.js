@@ -21,8 +21,18 @@ export function getReport(taskId) {
   return axios.get(`/contract/${taskId}/report`)
 }
 
-export function getHistory(page = 1, size = 10) {
-  return axios.get('/contract/history', { params: { page, size } })
+export function getHistory(page = 1, size = 10, status) {
+  const params = { page, size }
+  if (status && status !== 'ALL') params.status = status
+  return axios.get('/contract/history', { params })
+}
+
+export function getPreviewText(taskId) {
+  return axios.get(`/contract/${taskId}/text`)
+}
+
+export function getProcessLogs(taskId) {
+  return axios.get(`/contract/${taskId}/logs`)
 }
 
 export function retryTask(taskId) {

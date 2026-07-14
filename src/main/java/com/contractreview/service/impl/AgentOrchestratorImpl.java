@@ -1,5 +1,7 @@
 package com.contractreview.service.impl;
 
+import com.contractreview.domain.entity.ReviewProcessLog;
+import com.contractreview.mapper.ReviewProcessLogMapper;
 import com.contractreview.service.AgentOrchestrator;
 import com.contractreview.service.AgentService;
 import com.contractreview.service.RagService;
@@ -12,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +31,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
     private final AgentService agentService;
     private final RagService ragService;
     private final ReviewStateMachine stateMachine;
+    private final ReviewProcessLogMapper processLogMapper;
 
     private final Semaphore semaphore = new Semaphore(10);
 
@@ -47,8 +51,9 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             String userStance = classification.getOrDefault("userStance", "其他");
             String strategy = classification.getOrDefault("reviewStrategy", "标准审查");
             log.info("Agent A classified: type={}, stance={}", contractType, userStance);
-            sseService.sendLlmOutput(taskId, "Agent-A 合同分类",
-                    "合同类型: " + contractType + "\n立场: " + userStance + "\n策略: " + strategy);
+            String agentAResult = "合同类型: " + contractType + "\n立场: " + userStance + "\n策略: " + strategy;
+            sseService.sendLlmOutput(taskId, "Agent-A 合同分类", agentAResult);
+            saveProcessLog(taskId, "Agent-A 合同分类", agentAResult);
             stateMachine.transition(taskId, "PARSING", "RETRIEVING");
 
             sseService.sendProgress(taskId, "retrieving", 30, "正在检索相关法条...");
@@ -81,6 +86,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                                                     r.getOrDefault("description", "").toString().length())) + "\n";
                                 }
                                 sseService.sendLlmOutput(taskId, "Agent-B 条款审查", output);
+                                saveProcessLog(taskId, "Agent-B 条款审查", output);
                             }
                             return risks;
                         } finally {
@@ -114,8 +120,9 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             Map<String, Object> report = agentService.summarizeReport(allRisks, contractType);
             report.put("userStance", userStance);
             String summary = (String) report.getOrDefault("summary", "");
-            sseService.sendLlmOutput(taskId, "Agent-C 汇总报告",
-                    summary.length() > 500 ? summary.substring(0, 500) + "..." : summary);
+            String agentCSummary = summary.length() > 500 ? summary.substring(0, 500) + "..." : summary;
+            sseService.sendLlmOutput(taskId, "Agent-C 汇总报告", agentCSummary);
+            saveProcessLog(taskId, "Agent-C 汇总报告", agentCSummary);
 
             sseService.sendProgress(taskId, "completed", 100, "审查完成");
             return CompletableFuture.completedFuture(report);
@@ -124,6 +131,19 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             log.error("Review orchestration failed for task {}: {}", taskId, e.getMessage());
             sseService.sendError(taskId, "审查失败: " + e.getMessage());
             return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private void saveProcessLog(Long taskId, String agent, String content) {
+        try {
+            ReviewProcessLog log = new ReviewProcessLog();
+            log.setTaskId(taskId);
+            log.setAgent(agent);
+            log.setContent(content);
+            log.setCreatedAt(LocalDateTime.now());
+            processLogMapper.insert(log);
+        } catch (Exception e) {
+            log.warn("Failed to save process log for task {}: {}", taskId, e.getMessage());
         }
     }
 }
