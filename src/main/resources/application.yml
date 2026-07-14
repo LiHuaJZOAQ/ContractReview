@@ -7,11 +7,6 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 25MB
-  ai:
-    vectorstore:
-      chroma:
-        host: http://localhost:8000
-
 server:
   port: 8080
 
