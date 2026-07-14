@@ -22,9 +22,11 @@ export function getReport(taskId) {
 }
 
 export function getHistory(page = 1, size = 10, status) {
-  const params = { page, size }
-  if (status && status !== 'ALL') params.status = status
-  return axios.get('/contract/history', { params })
+  let url = '/contract/history'
+  if (status && status !== 'ALL') {
+    url += '/' + encodeURIComponent(status)
+  }
+  return axios.get(url, { params: { page, size } })
 }
 
 export function getPreviewText(taskId) {

@@ -56,7 +56,6 @@ let startTime = null
 
 const stages = ref([
   { key: 'parsing', label: '解析文档', status: 'pending', detail: '' },
-  { key: 'classifying', label: '合同分类', status: 'pending', detail: '' },
   { key: 'retrieving', label: '检索法条', status: 'pending', detail: '' },
   { key: 'reviewing', label: '审查条款', status: 'pending', detail: '' },
   { key: 'summarizing', label: '汇总报告', status: 'pending', detail: '' },
@@ -115,8 +114,8 @@ function open() {
     const data = JSON.parse(e.data)
     percentage.value = data.progress
 
-    const status = data.status
-    const stageKeys = ['parsing', 'classifying', 'retrieving', 'reviewing', 'summarizing']
+    const status = (data.status || '').toLowerCase()
+    const stageKeys = ['parsing', 'retrieving', 'reviewing', 'summarizing']
     const idx = stageKeys.indexOf(status)
 
     stages.value.forEach((s, i) => {

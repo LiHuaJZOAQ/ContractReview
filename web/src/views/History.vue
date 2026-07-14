@@ -103,7 +103,9 @@ async function handleRetry(row) {
     await retryTask(row.taskId)
     ElMessage.success('已重新提交审查')
     await fetchHistory()
-  } catch {}
+  } catch (e) {
+    ElMessage.error(e?.message || '重试失败')
+  }
 }
 
 onMounted(fetchHistory)
