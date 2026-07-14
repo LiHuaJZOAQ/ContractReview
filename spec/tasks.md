@@ -385,6 +385,28 @@ graph TD
 
 ## Notes
 
+### 已完成扩展功能（联调后新增，未在 Wave 中体现）
+
+| 功能 | 说明 | 涉及文件 |
+|------|------|----------|
+| 审查过程持久化 | 新建 `review_process_log` 表，Agent A/B/C 输出同时写入 DB | ReviewProcessLog.java, ReviewProcessLogMapper.java, AgentOrchestratorImpl.java, init.sql |
+| 合同原文 API | `GET /{taskId}/text` 返回预览文本 | ContractController.java, ContractServiceImpl.java |
+| 过程日志 API | `GET /{taskId}/logs` 返回 Agent 输出记录 | ContractController.java, ContractServiceImpl.java |
+| 历史筛选 | `GET /history?status=` 支持按状态过滤（逗号分隔多状态） | ContractServiceImpl.java |
+| Report 三选项卡 | 审查报告 / 合同原文 / 审查过程 | Report.vue |
+| History 筛选选项卡 | 全部 / 进行中 / 已完成 / 失败 | History.vue |
+| SSE `llm_output` 事件 | 推送 Agent 中间结果到前端 | SseService.java, AgentOrchestratorImpl.java |
+
+### 联调修复汇总
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| Redis Lua 参数序列化 | `GenericJackson2JsonRedisSerializer` 将字符串 `"60"` 序列化为 `"\"60\""`，`tonumber` 返回 nil | 改用 `StringRedisTemplate` |
+| RabbitMQ 消息转换 | 默认 `SimpleMessageConverter` 不支持 POJO | 配置 `Jackson2JsonMessageConverter` |
+| 状态机死锁 | AgentOrchestrator 未调用 `stateMachine.transition()`，状态卡在 PARSING | 添加各阶段 `transition()` 调用 |
+| 状态覆盖 | `handleSuccess/handleFailure` 先 `transition()` 更新 DB，后又用旧 task 对象 `updateById` 覆盖 | 移除多余的 `updateById` |
+| 风险计数为 0 | 直接取 LLM 返回的 `riskCount`（LLM 常算成 0） | 改为从实际 `risks` 列表逐条统计 |
+
 ### 已知风险
 
 | 风险 | 影响 | 缓解措施 |
@@ -393,6 +415,8 @@ graph TD
 | Chroma 向量库首次构建耗时 | 延迟 Phase 2 启动 | Phase 1 提前准备法条数据 + 入库脚本 |
 | 脱敏正则误匹配 | 用户隐私泄露风险 | P0 正则 + P1 NLP 增强渐进；验收标准要求 ≥ 90% 命中率 |
 | 大合同（> 50 页）审查超阈值 | 总耗时 > 5min 触发熔断 | Map-Reduce 分片处理，超时熔断后支持手动重试 |
+| ~~Chroma Embedding 404~~ | opencode 供应商不支持 `/v1/embeddings` | **已修复**：改用 LLM chat 直接检索相关法条，移除 Chroma 依赖 |
+| ~~flk.npc.gov.cn 反爬~~ | 法规数据库拒绝自动化请求（HTTP 493） | **已修复**：移除 Jsoup 爬取，统一使用 LLM 法律知识检索 |
 
 ### 假设条件
 

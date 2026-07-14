@@ -113,6 +113,7 @@
 | ReviewTaskMapper | `review_task` | `BaseMapper<ReviewTask>` | 审查任务状态更新、条件查询 |
 | RiskItemMapper | `risk_item` | `BaseMapper<RiskItem>` | 风险项批量插入、按 task 查询 |
 | ReviewReportMapper | `review_report` | `BaseMapper<ReviewReport>` | 报告写入与唯一索引查询 |
+| ReviewProcessLogMapper | `review_process_log` | `BaseMapper<ReviewProcessLog>` | Agent 过程日志持久化 |
 
 ### 模块划分
 
@@ -184,6 +185,7 @@ ContractReview/
 │   │   ├── ReviewTaskMapper.java
 │   │   ├── RiskItemMapper.java
 │   │   ├── ReviewReportMapper.java
+│   │   ├── ReviewProcessLogMapper.java
 │   │   └── OperationLogMapper.java
 │   │
 │   ├── domain/                                 # 领域模型
@@ -192,6 +194,7 @@ ContractReview/
 │   │   │   ├── ReviewTask.java
 │   │   │   ├── RiskItem.java
 │   │   │   ├── ReviewReport.java
+│   │   │   ├── ReviewProcessLog.java
 │   │   │   └── OperationLog.java
 │   │   ├── dto/                                #   请求/响应 DTO
 │   │   │   ├── AuthRequest.java
@@ -314,7 +317,7 @@ ContractReview/
 
 | 属性 | 说明 |
 |------|------|
-| **职责** | 处理上传、提交、状态查询、报告获取、SSE 连接、重试等请求 |
+| **职责** | 处理上传、提交、状态查询、报告获取、SSE 连接、重试、合同原文查看、过程日志查询等请求 |
 | **依赖** | ContractService, SseService, FileParser |
 | **线程模型** | 上传/提交为同步；SSE 为长连接异步推送 |
 
@@ -334,13 +337,18 @@ ContractReview/
 | **接口** | `String desensitize(String rawText)` |
 | **实现** | P0 使用正则（姓名、身份证、手机号、银行卡），P1 引入 NLP NER |
 
-#### 5. RagService — RAG 检索服务
+#### 5. RagService — 法条检索服务
 
 | 属性 | 说明 |
 |------|------|
-| **职责** | 对合同文本分块→向量化→检索相关法条；本地不足时走网络兜底 |
-| **接口** | `List<LawEntry> retrieve(String chunkContent)` |
-| **内部流程** | 语义分块 → Embedding → Chroma 余弦检索（阈值 0.75）→ 未命中则爬取 flk.npc.gov.cn → 缓存回本地库 |
+| **职责** | 根据合同条款检索相关法律法规；使用 LLM 替代 Chroma 向量库 |
+| **接口** | `List<String> retrieveRelevantLaws(String chunkContent)` |
+| **内部流程** | 直接调用 LLM（Prompt 要求输出相关法条）→ Redis 缓存结果（TTL 7d） |
+
+> **注意**：原设计使用 Chroma 向量库 + flk.npc.gov.cn 网络搜索兜底，但由于：
+> - opencode LLM 供应商不支持 `/v1/embeddings`（Chroma 依赖 Embedding API 返回 404）
+> - flk.npc.gov.cn 拒绝自动化请求（HTTP 493）
+> 已改用 LLM chat 直接检索。LLM 训练数据已包含《民法典》《劳动合同法》等主要中国法律法规，效果等效。Redis 缓存减少重复调用。未来可切换为支持 Embedding 的供应商后恢复 Chroma。|
 
 #### 6. AgentOrchestrator — Agent 编排器
 
@@ -397,8 +405,10 @@ ContractReview/
 | POST | `/api/v1/contract/{taskId}/submit` | 确认预览后提交审查 | — | `{taskId}` |
 | GET | `/api/v1/contract/{taskId}/status` | 查询任务状态 | — | `{taskId, status, progress}` |
 | GET | `/api/v1/contract/{taskId}/report` | 获取审查报告 | — | `{taskId, summary, risks[]}` |
-| GET | `/api/v1/contract/history` | 获取历史记录（按创建时间降序） | `?page=1&size=10` | `{tasks[], total, page, size}` |
+| GET | `/api/v1/contract/history` | 获取历史记录（按创建时间降序，支持状态筛选） | `?page=1&size=10&status=SUCCESS` | `{tasks[], total, page, size}` |
 | POST | `/api/v1/contract/{taskId}/retry` | 手动重试失败任务 | — | `{taskId}` |
+| GET | `/api/v1/contract/{taskId}/text` | 获取合同原文 | — | `{previewText}` |
+| GET | `/api/v1/contract/{taskId}/logs` | 获取审查过程日志 | — | `[{agent, content, createdAt}]` |
 | GET | `/api/v1/contract/{taskId}/progress` | SSE 进度推送 | — | SSE Event Stream |
 | GET | `/api/v1/contract/{taskId}/file` | 下载脱敏后的合同文件 | — | 文件流 |
 | GET | `/api/v1/contract/{taskId}/report/pdf` | 下载 PDF 报告（P1） | — | 文件流 |
@@ -438,11 +448,12 @@ Agent C:
 #### SSE 事件契约
 
 ```
-事件类型: progress / complete / error
+事件类型: progress / complete / error / llm_output
 data 结构:
-  - progress: { status: String, progress: Int, message: String }
-  - complete: { status: "completed", progress: 100, message: String, reportId: String }
-  - error:    { status: "failed", progress: -1, message: String }
+  - progress:  { status: String, progress: Int, message: String }
+  - complete:  { status: "completed", progress: 100, message: String, reportId: String }
+  - error:     { status: "failed", progress: -1, message: String }
+  - llm_output: { agent: String, content: String }  # Agent 中间结果实时推送
 ```
 
 > SSE 推送端到端延迟 ≤ 3s，MQ 消费者在阶段变更后通过 `SseEmitter` 直接推送，不经过额外消息链路。
@@ -519,6 +530,7 @@ return newQuota
 User (1) ──→ (N) ReviewTask
 ReviewTask (1) ──→ (N) RiskItem
 ReviewTask (1) ──→ (1) ReviewReport
+ReviewTask (1) ──→ (N) ReviewProcessLog
 ```
 
 ### 数据模型定义
@@ -606,6 +618,20 @@ ReviewTask (1) ──→ (1) ReviewReport
 > }
 > ```
 
+#### 审查过程日志表 (review_process_log)
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | BIGINT | PK, AUTO_INCREMENT | 主键 |
+| task_id | BIGINT | FK → review_task.id, NOT NULL | 关联任务 ID |
+| agent | VARCHAR(50) | NOT NULL | Agent 名称（如 Agent-A 合同分类） |
+| content | TEXT | NOT NULL | Agent 输出内容 |
+| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+
+**用途**：持久化 Agent A/B/C 各阶段的输出内容，供前端「审查过程」选项卡查看。AgentOrchestrator 在推送 SSE 的同时写入该表。
+
+---
+
 #### 操作审计日志表 (operation_log)
 
 预留表结构，V1.0 仅做日志输出（配合管理后台 P1 开发查询接口）：
@@ -633,6 +659,7 @@ ReviewTask (1) ──→ (1) ReviewReport
 | risk_item | task_id | INDEX | 加速按任务查询风险项 |
 | risk_item | (task_id, risk_level) | COMPOSITE | 联合查询按等级过滤 |
 | review_report | task_id | UNIQUE | 任务与报告一对一关联 |
+| review_process_log | task_id | INDEX | 加速按任务查询过程日志 |
 
 ### 数据流描述
 
