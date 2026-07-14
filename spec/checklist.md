@@ -104,6 +104,10 @@
 - [x] **review_report 表建表**
   - [x] 字段：id, task_id(UNIQUE), summary, risk_count_high, risk_count_medium, risk_count_low, report_json, pdf_url, created_at
   - [x] task_id 唯一索引
+- [x] **review_process_log 表建表**
+  - [x] 字段：id, task_id, agent(VARCHAR 50), content(TEXT), created_at
+  - [x] task_id 索引（加速按任务查询过程日志）
+  - [x] Agent A/B/C 输出持久化，同时写入 DB 和 SSE 推送
 
 ### 查询与报告
 
@@ -117,6 +121,13 @@
   - [x] 分页返回（page / size 参数）
   - [x] 按 created_at 降序
   - [x] 只返回当前用户的任务
+  - [x] 支持 `?status=` 按状态筛选（逗号分隔多状态）
+- [x] **合同原文 `GET /api/v1/contract/{taskId}/text`**
+  - [x] 返回 preview_text 原始内容
+  - [x] 权限校验（仅任务所属用户可访问）
+- [x] **过程日志 `GET /api/v1/contract/{taskId}/logs`**
+  - [x] 返回 Agent A/B/C 输出记录列表
+  - [x] 按 created_at 升序
 
 ### 异步化与状态机
 
@@ -151,9 +162,10 @@
 
 ### RAG 法条检索
 
-- [ ] **Chroma 向量数据库**
+- [x] **Chroma 向量数据库**
   - [x] Docker Compose Chroma 容器配置（端口 8000）
   - [x] Spring AI Chroma 集成配置（`spring-ai-chroma-store-spring-boot-starter`）
+  - [x] Chroma 为主路径 + Embedding 不可用时降级到 LLM 兜底
 - [x] **法条向量化入库**
   - [x] 《民法典》《劳动合同法》《著作权法》完整文本（`src/main/resources/laws/`）
   - [x] Embedding 向量化存储（`LawSeedRunner` 启动时自动执行）
@@ -162,9 +174,10 @@
   - [x] 按条款/段落分块
   - [x] 保留上下文信息
 - [x] **混合检索 Service**
-  - [x] 本地 Chroma 余弦检索（阈值 0.75 可配置）
-  - [x] 未命中时网络搜索 flk.npc.gov.cn 兜底
-  - [x] 网络结果缓存 TTL 7d
+  - [x] 本地 Chroma 余弦检索（阈值 0.75 可配置，TopK=3）
+  - [x] Embedding 不可用时自动降级到 LLM 检索兜底（双路径设计）
+  - [x] 结果缓存 Redis（Chroma 命中 1d / LLM 命中 7d）
+  - [x] ~~网络搜索 flk.npc.gov.cn 兜底~~（遭 493 反爬，已替换为 LLM）
 
 ### Multi-Agent 编排
 
@@ -193,7 +206,7 @@
   - [x] prefetch = 10
 - [x] **SSE 推送**
   - [x] SseEmitter 连接管理（ConcurrentHashMap）
-  - [x] 推送事件类型：progress / complete / error
+  - [x] 推送事件类型：progress / complete / error / llm_output
   - [ ] SSE 端到端延迟 ≤ 3s（待集成测试验证）
   - [ ] 连接断开指数退避重连机制（前端侧）
 - [x] **完整状态机**
@@ -249,22 +262,24 @@
 - [ ] **注册/登录页面**
   - [ ] 表单校验
   - [ ] Token 持久化存储
-- [ ] **文件上传页面**
-  - [ ] 拖拽上传
-  - [ ] 脱敏预览文本展示
-  - [ ] 确认提交按钮
-- [ ] **SSE 进度条**
-  - [ ] EventSource 连接
-  - [ ] 阶段文字提示
-  - [ ] 进度百分比展示
-- [ ] **审查报告页面**
-  - [ ] 风险等级标签（HIGH 红色 / MEDIUM 黄色 / LOW 蓝色）
-  - [ ] 风险分类
-  - [ ] 修改建议展示
-  - [ ] 关联法条链接
-- [ ] **历史记录页面**
-  - [ ] 分页列表
-  - [ ] 任务状态筛选
+- [x] **文件上传页面**
+  - [x] 拖拽上传
+  - [x] 脱敏预览文本展示
+  - [x] 确认提交按钮
+  - [x] SseProgress 内联进度条（计时 + 流式输出）
+- [x] **SSE 进度条**
+  - [x] EventSource 连接
+  - [x] 阶段文字提示
+  - [x] 进度百分比展示
+- [x] **审查报告页面**
+  - [x] 风险等级标签（HIGH 红色 / MEDIUM 黄色 / LOW 蓝色）
+  - [x] 风险分类
+  - [x] 修改建议展示
+  - [x] 关联法条链接
+  - [x] 三选项卡：审查报告 / 合同原文 / 审查过程
+- [x] **历史记录页面**
+  - [x] 分页列表
+  - [x] 任务状态筛选（全部 / 进行中 / 已完成 / 失败）
 
 ### 功能完善
 

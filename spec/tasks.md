@@ -385,7 +385,21 @@ graph TD
 
 ## Notes
 
-### 已完成扩展功能（联调后新增，未在 Wave 中体现）
+### 已完成扩展功能 & 架构修正
+
+#### 新增功能
+
+| 功能 | 说明 | 涉及文件 |
+|------|------|----------|
+| 审查过程持久化 | 新建 `review_process_log` 表，Agent A/B/C 输出同时写入 DB | ReviewProcessLog.java, ReviewProcessLogMapper.java, AgentOrchestratorImpl.java, init.sql |
+| 合同原文 API | `GET /{taskId}/text` 返回预览文本 | ContractController.java, ContractServiceImpl.java |
+| 过程日志 API | `GET /{taskId}/logs` 返回 Agent 输出记录 | ContractController.java, ContractServiceImpl.java |
+| 历史筛选 | `GET /history?status=` 支持按状态过滤（逗号分隔多状态） | ContractServiceImpl.java |
+| Report 三选项卡 | 审查报告 / 合同原文 / 审查过程 | Report.vue |
+| History 筛选选项卡 | 全部 / 进行中 / 已完成 / 失败 | History.vue |
+| SSE `llm_output` 事件 | 推送 Agent 中间结果到前端 | SseService.java, AgentOrchestratorImpl.java |
+
+#### 架构修正
 
 | 功能 | 说明 | 涉及文件 |
 |------|------|----------|
@@ -406,6 +420,8 @@ graph TD
 | 状态机死锁 | AgentOrchestrator 未调用 `stateMachine.transition()`，状态卡在 PARSING | 添加各阶段 `transition()` 调用 |
 | 状态覆盖 | `handleSuccess/handleFailure` 先 `transition()` 更新 DB，后又用旧 task 对象 `updateById` 覆盖 | 移除多余的 `updateById` |
 | 风险计数为 0 | 直接取 LLM 返回的 `riskCount`（LLM 常算成 0） | 改为从实际 `risks` 列表逐条统计 |
+| Chroma 被误删 | 之前修复 Embedding 404 时错误地移除了 VectorStore 和 Chroma 配置 | 恢复 Chroma 为主路径，Embedding 异常时降级到 LLM 兜底（双路径设计） |
+| flk.npc.gov.cn 爬虫 493 | NPC 网站返回 493 禁止自动化请求 | 移除 Jsoup 爬虫，用 LLM 检索替代网络兜底 |
 
 ### 已知风险
 
