@@ -423,6 +423,23 @@ graph TD
 | Chroma 被误删 | 之前修复 Embedding 404 时错误地移除了 VectorStore 和 Chroma 配置 | 恢复 Chroma 为主路径，Embedding 异常时降级到 LLM 兜底（双路径设计） |
 | flk.npc.gov.cn 爬虫 493 | NPC 网站返回 493 禁止自动化请求 | 移除 Jsoup 爬虫，用 LLM 检索替代网络兜底 |
 
+### 测试完成记录（2026-07）
+
+| 文件 | 用例数 | 覆盖内容 | 状态 |
+|------|--------|----------|:----:|
+| `AgentServiceImplTest.java` | 10 | Agent A/B/C Prompt 调用、JSON 解析、长文本截断、null 响应 | ✅ |
+| `RagServiceImplTest.java` | 7 | Chroma 命中、异常降级 LLM、空结果兜底、Redis 缓存、LLM 异常、超长文本截断 | ✅ |
+| `ReviewStateMachineImplTest.java` | 18 | 11 条合法转换、6 条异常路径、重试字段重置 | ✅ |
+| `SseServiceImplTest.java` | 8 | 4 种 SSE 事件、Emitter 管理、不存在 taskId、发送失败移除 | ✅ |
+| `ReviewMessageListenerTest.java` | 8 | handleSuccess/Failure、DLX 重试/超限、任务跳过、风险计数 | ✅ |
+| `ContractServiceImplTest.java` | 20 | 已修复：构造参数、getHistory 签名 | ✅ |
+| **合计** | **100** | **全部通过** | |
+
+### 服务代码修复
+
+- `AgentServiceImpl.extractJsonObject` — 正则改为栈计数，正确匹配嵌套 JSON
+- `AgentServiceImpl.parseMapObjectResult` — `Map.of()` 改为 `new HashMap<>()`，避免 UnsupportedOperationException
+
 ### 已知风险
 
 | 风险 | 影响 | 缓解措施 |

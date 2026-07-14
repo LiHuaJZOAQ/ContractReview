@@ -150,6 +150,14 @@
   - [x] 配额不足 → 返回 1003
 - [ ] **全链路集成测试** — 待 Docker 启动后验证
 - [x] **单元测试覆盖率 ≥ 60%**
+- [x] **新测试覆盖（2026-07）**
+  - [x] `RagServiceImplTest` — Chroma 主路径/异常降级/LLM 兜底/Redis 缓存/超长文本截断（7 用例）
+  - [x] `ReviewStateMachineImplTest` — 所有 11 条合法转换路径/异常状态/非法转换（18 用例）
+  - [x] `AgentServiceImplTest` — Agent A/B/C 正常/非法响应/null 响应/风险补全（10 用例）
+  - [x] `SseServiceImplTest` — 4 种事件发送/Emitter 移除/发送失败自动清理（8 用例）
+  - [x] `ReviewMessageListenerTest` — handleSuccess/handleFailure/DLX 重试/风险计数（8 用例）
+  - [x] 修复 `AgentServiceImpl.extractJsonObject` 嵌套 JSON 支持及 null 返回可变 Map
+  - [x] 全部 100 个单元测试编译 + 运行通过
 
 ### Phase 1 里程碑
 

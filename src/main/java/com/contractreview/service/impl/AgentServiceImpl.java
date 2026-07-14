@@ -84,13 +84,13 @@ public class AgentServiceImpl implements AgentService {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseMapObjectResult(String response) {
-        if (response == null) return Map.of();
+        if (response == null) return new HashMap<>();
         String json = extractJsonObject(response);
         try {
             return objectMapper.readValue(json, HashMap.class);
         } catch (Exception e) {
             log.warn("Failed to parse LLM result: {}", e.getMessage());
-            return Map.of();
+            return new HashMap<>();
         }
     }
 
@@ -146,9 +146,14 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private String extractJsonObject(String text) {
-        Pattern p = Pattern.compile("\\{[^{}]*+(?:[^{}]*+)*\\}");
-        Matcher m = p.matcher(text);
-        if (m.find()) return m.group();
+        int start = text.indexOf('{');
+        if (start < 0) return text;
+        int depth = 0;
+        for (int i = start; i < text.length(); i++) {
+            if (text.charAt(i) == '{') depth++;
+            else if (text.charAt(i) == '}') depth--;
+            if (depth == 0) return text.substring(start, i + 1);
+        }
         return text;
     }
 
