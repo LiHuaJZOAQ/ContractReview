@@ -104,6 +104,10 @@
 - [x] **review_report 表建表**
   - [x] 字段：id, task_id(UNIQUE), summary, risk_count_high, risk_count_medium, risk_count_low, report_json, pdf_url, created_at
   - [x] task_id 唯一索引
+- [x] **review_process_log 表建表**
+  - [x] 字段：id, task_id, agent(VARCHAR 50), content(TEXT), created_at
+  - [x] task_id 索引（加速按任务查询过程日志）
+  - [x] Agent A/B/C 输出持久化，同时写入 DB 和 SSE 推送
 
 ### 查询与报告
 
@@ -117,6 +121,13 @@
   - [x] 分页返回（page / size 参数）
   - [x] 按 created_at 降序
   - [x] 只返回当前用户的任务
+  - [x] 支持 `?status=` 按状态筛选（逗号分隔多状态）
+- [x] **合同原文 `GET /api/v1/contract/{taskId}/text`**
+  - [x] 返回 preview_text 原始内容
+  - [x] 权限校验（仅任务所属用户可访问）
+- [x] **过程日志 `GET /api/v1/contract/{taskId}/logs`**
+  - [x] 返回 Agent A/B/C 输出记录列表
+  - [x] 按 created_at 升序
 
 ### 异步化与状态机
 
@@ -139,6 +150,14 @@
   - [x] 配额不足 → 返回 1003
 - [ ] **全链路集成测试** — 待 Docker 启动后验证
 - [x] **单元测试覆盖率 ≥ 60%**
+- [x] **新测试覆盖（2026-07）**
+  - [x] `RagServiceImplTest` — Chroma 主路径/异常降级/LLM 兜底/Redis 缓存/超长文本截断（7 用例）
+  - [x] `ReviewStateMachineImplTest` — 所有 11 条合法转换路径/异常状态/非法转换（18 用例）
+  - [x] `AgentServiceImplTest` — Agent A/B/C 正常/非法响应/null 响应/风险补全（10 用例）
+  - [x] `SseServiceImplTest` — 4 种事件发送/Emitter 移除/发送失败自动清理（8 用例）
+  - [x] `ReviewMessageListenerTest` — handleSuccess/handleFailure/DLX 重试/风险计数（8 用例）
+  - [x] 修复 `AgentServiceImpl.extractJsonObject` 嵌套 JSON 支持及 null 返回可变 Map
+  - [x] 全部 100 个单元测试编译 + 运行通过
 
 ### Phase 1 里程碑
 
@@ -151,66 +170,68 @@
 
 ### RAG 法条检索
 
-- [ ] **Chroma 向量数据库**
-  - [ ] Docker 启动 Chroma 容器
-  - [ ] Spring AI Chroma 集成配置
-- [ ] **法条向量化入库**
-  - [ ] 《民法典》《劳动合同法》等核心法条文本准备
-  - [ ] Embedding 向量化存储
-  - [ ] 入库脚本可重复执行（幂等）
-- [ ] **语义分块**
-  - [ ] 按条款/段落分块
-  - [ ] 保留上下文信息
-- [ ] **混合检索 Service**
-  - [ ] 本地 Chroma 余弦检索（阈值 0.75 可配置）
-  - [ ] 未命中时网络搜索 flk.npc.gov.cn 兜底
-  - [ ] 网络结果缓存 TTL 7d
+- [x] **Chroma 向量数据库**
+  - [x] Docker Compose Chroma 容器配置（端口 8000）
+  - [x] Spring AI Chroma 集成配置（`spring-ai-chroma-store-spring-boot-starter`）
+  - [x] Chroma 为主路径 + Embedding 不可用时降级到 LLM 兜底
+- [x] **法条向量化入库**
+  - [x] 《民法典》《劳动合同法》《著作权法》完整文本（`src/main/resources/laws/`）
+  - [x] Embedding 向量化存储（`LawSeedRunner` 启动时自动执行）
+  - [x] 入库脚本幂等（首次为空时写入，已有数据跳过）
+- [x] **语义分块**
+  - [x] 按条款/段落分块
+  - [x] 保留上下文信息
+- [x] **混合检索 Service**
+  - [x] 本地 Chroma 余弦检索（阈值 0.75 可配置，TopK=3）
+  - [x] Embedding 不可用时自动降级到 LLM 检索兜底（双路径设计）
+  - [x] 结果缓存 Redis（Chroma 命中 1d / LLM 命中 7d）
+  - [x] ~~网络搜索 flk.npc.gov.cn 兜底~~（遭 493 反爬，已替换为 LLM）
 
 ### Multi-Agent 编排
 
-- [ ] **Agent A：分类定调**
-  - [ ] 输出合同类型（租房/劳动合同/外包协议 等）
-  - [ ] 输出用户立场（承租方/出租方/劳动者 等）
-  - [ ] 输出审查策略
-- [ ] **Agent B：风险扫描**
-  - [ ] 基于 Chunk 逐条扫描
-  - [ ] Semaphore(10) 并发控制
-  - [ ] 输出风险点（等级、类型、描述、建议）
-  - [ ] 关联对应法条
-- [ ] **Agent C：报告汇总**
-  - [ ] 汇总风险统计
-  - [ ] 生成审查总结
-- [ ] **Agent 编排器**
-  - [ ] A → 分块 → RAG → B(并发) → C 自动流转
-  - [ ] 异常时中断并回滚状态
+- [x] **Agent A：分类定调**
+  - [x] 输出合同类型（租房/劳动合同/外包协议 等）
+  - [x] 输出用户立场（承租方/出租方/劳动者 等）
+  - [x] 输出审查策略
+- [x] **Agent B：风险扫描**
+  - [x] 基于 Chunk 逐条扫描
+  - [x] Semaphore(10) 并发控制
+  - [x] 输出风险点（等级、类型、描述、建议）
+  - [x] 关联对应法条
+- [x] **Agent C：报告汇总**
+  - [x] 汇总风险统计
+  - [x] 生成审查总结
+- [x] **Agent 编排器**
+  - [x] A → 分块 → RAG → B(并发) → C 自动流转
+  - [x] 异常时中断并回滚状态
 
 ### 异步任务与 SSE
 
-- [ ] **RabbitMQ**
-  - [ ] 容器启动
-  - [ ] 队列配置：contract.review.queue
-  - [ ] 死信队列：contract.review.dlx
-  - [ ] prefetch = 10
-- [ ] **SSE 推送**
-  - [ ] SseEmitter 连接管理（ConcurrentHashMap）
-  - [ ] 推送事件类型：progress / complete / error
-  - [ ] SSE 端到端延迟 ≤ 3s
-  - [ ] 连接断开指数退避重连机制
-- [ ] **完整状态机**
-  - [ ] PENDING → PARSING → RETRIEVING → REVIEWING → SUMMARIZING → SUCCESS / FAILED
-  - [ ] 非法状态转换拒绝
-  - [ ] 超时熔断（各阶段阈值）
-  - [ ] 指数退避重试最多 3 次
-- [ ] **MQ 消费者**
-  - [ ] 消费消息 → 驱动状态机 → SSE 推送进度
-  - [ ] 成功 ACK / 失败 NACK 入 DLX
-- [ ] **手动重试 `POST /api/v1/contract/{taskId}/retry`**
-  - [ ] 仅 FAILED 状态可重试
-  - [ ] 重试后重新投递 MQ
+- [x] **RabbitMQ**
+  - [ ] 容器启动（需 `docker-compose up`）
+  - [x] 队列配置：contract.review.queue
+  - [x] 死信队列：contract.review.dlx
+  - [x] prefetch = 10
+- [x] **SSE 推送**
+  - [x] SseEmitter 连接管理（ConcurrentHashMap）
+  - [x] 推送事件类型：progress / complete / error / llm_output
+  - [ ] SSE 端到端延迟 ≤ 3s（待集成测试验证）
+  - [ ] 连接断开指数退避重连机制（前端侧）
+- [x] **完整状态机**
+  - [x] PENDING → PARSING → RETRIEVING → REVIEWING → SUMMARIZING → SUCCESS / FAILED
+  - [x] 非法状态转换拒绝
+  - [x] 超时熔断（各阶段阈值可配置）
+  - [x] 指数退避重试最多 3 次（Spring Retry + DLX 双保险）
+- [x] **MQ 消费者**
+  - [x] 消费消息 → 驱动状态机 → SSE 推送进度
+  - [x] 成功 ACK / 失败 NACK 入 DLX
+- [x] **手动重试 `POST /api/v1/contract/{taskId}/retry`**
+  - [x] 仅 FAILED 状态可重试
+  - [x] 重试后重新投递 MQ
 
 ### Phase 2 里程碑
 
-- [ ] **M2 — 具备完整 RAG + Multi-Agent + 异步 SSE 能力**
+- [x] **M2 — 具备完整 RAG + Multi-Agent + 异步 SSE 能力**
 
 ---
 
@@ -218,21 +239,27 @@
 
 ### 安全加固
 
-- [ ] **Spring Security 完整鉴权链**
-  - [ ] SecurityFilterChain 配置
-  - [ ] 权限路径匹配
-  - [ ] CSRF 配置
-- [ ] **Token 刷新**
-  - [ ] `POST /auth/refresh` 接口
-  - [ ] Refresh Token 30d Redis 存储
-  - [ ] Token 自动续期
-- [ ] **Redis 滑动窗口限流**
-  - [ ] Lua 脚本原子实现
-  - [ ] 超限返回错误码 1008
-- [ ] **操作审计**
-  - [ ] AOP 切面记录关键操作（注册/上传/提交/查看报告/重试）
-  - [ ] operation_log 表写入
-  - [ ] IP 地址记录
+- [x] **Spring Security 完整鉴权链**
+  - [x] SecurityFilterChain 配置（CORS、CSRF、无状态会话）
+  - [x] 权限路径匹配（`/auth/**` 放行，其余 `/api/v1/**` 认证）
+  - [x] OncePerRequestFilter JWT 校验替换 HandlerInterceptor
+- [x] **Token 刷新**
+  - [x] `POST /auth/refresh` 接口（Redis 30d 存储 + 轮换）
+  - [x] Refresh Token JWT 验证兜底（Redis 丢失时仍可用）
+  - [x] 重用检测防止重放攻击
+  - [x] `expiresIn` 字段返回 access token 有效期
+- [x] **Redis 滑动窗口限流**
+  - [x] Lua 脚本原子实现（ZREMRANGEBYSCORE + ZCARD）
+  - [x] 超限返回错误码 1008（HTTP 429）
+  - [x] 配置项 `contract.rate-limit.max-per-minute`
+- [x] **Lua 原子配额扣减**
+  - [x] 消除 TOCTOU 竞态（原 Java GET+check+DECR 改为 Lua 原子执行）
+  - [x] `quota_deduct.lua` 脚本 + `DefaultRedisScript<Long>` Bean
+- [x] **操作审计**
+  - [x] `@AuditLog` 注解 + AOP 切面
+  - [x] 记录操作：REGISTER / UPLOAD / SUBMIT / VIEW_REPORT / RETRY
+  - [x] operation_log 表写入（userId、action、taskId、detail、ipAddress）
+  - [x] IP 地址记录（X-Forwarded-For / X-Real-IP / RemoteAddr）
 
 ### 前端
 
@@ -243,22 +270,24 @@
 - [ ] **注册/登录页面**
   - [ ] 表单校验
   - [ ] Token 持久化存储
-- [ ] **文件上传页面**
-  - [ ] 拖拽上传
-  - [ ] 脱敏预览文本展示
-  - [ ] 确认提交按钮
-- [ ] **SSE 进度条**
-  - [ ] EventSource 连接
-  - [ ] 阶段文字提示
-  - [ ] 进度百分比展示
-- [ ] **审查报告页面**
-  - [ ] 风险等级标签（HIGH 红色 / MEDIUM 黄色 / LOW 蓝色）
-  - [ ] 风险分类
-  - [ ] 修改建议展示
-  - [ ] 关联法条链接
-- [ ] **历史记录页面**
-  - [ ] 分页列表
-  - [ ] 任务状态筛选
+- [x] **文件上传页面**
+  - [x] 拖拽上传
+  - [x] 脱敏预览文本展示
+  - [x] 确认提交按钮
+  - [x] SseProgress 内联进度条（计时 + 流式输出）
+- [x] **SSE 进度条**
+  - [x] EventSource 连接
+  - [x] 阶段文字提示
+  - [x] 进度百分比展示
+- [x] **审查报告页面**
+  - [x] 风险等级标签（HIGH 红色 / MEDIUM 黄色 / LOW 蓝色）
+  - [x] 风险分类
+  - [x] 修改建议展示
+  - [x] 关联法条链接
+  - [x] 三选项卡：审查报告 / 合同原文 / 审查过程
+- [x] **历史记录页面**
+  - [x] 分页列表
+  - [x] 任务状态筛选（全部 / 进行中 / 已完成 / 失败）
 
 ### 功能完善
 

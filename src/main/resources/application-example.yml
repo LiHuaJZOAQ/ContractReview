@@ -12,6 +12,21 @@ spring:
       password: ${REDIS_PASSWORD:}
       database: 0
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        prefetch: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2
+          max-interval: 10000
+
   ai:
     openai:
       base-url: https://你的接口地址/v1

@@ -20,12 +20,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +40,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-
-@ExtendWith(MockitoExtension.class)
 class ContractServiceImplTest {
 
     @Mock private ObjectMapper objectMapper;
@@ -48,10 +48,14 @@ class ContractServiceImplTest {
     @Mock private RiskItemMapper riskItemMapper;
     @Mock private ReviewReportMapper reportMapper;
     @Mock private UserMapper userMapper;
+    @Mock private ReviewProcessLogMapper processLogMapper;
     @Mock private MinioClient minioClient;
     @Mock private RedisTemplate<String, Object> redisTemplate;
-    @Mock private ValueOperations<String, Object> valueOps;
-    @Mock private LLMReviewService llmReviewService;
+    @Mock private DefaultRedisScript<Long> quotaDeductScript;
+    @Mock private RabbitTemplate rabbitTemplate;
+
+    @SuppressWarnings("unchecked")
+    private org.springframework.data.redis.core.ValueOperations<String, Object> valueOps;
 
     private ContractServiceImpl contractService;
     private final Long userId = 1L;
@@ -59,10 +63,11 @@ class ContractServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        valueOps = mock(org.springframework.data.redis.core.ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         contractService = new ContractServiceImpl(
                 objectMapper, fileUtil, taskMapper, riskItemMapper,
-                reportMapper, userMapper, minioClient, redisTemplate, llmReviewService);
+                reportMapper, userMapper, processLogMapper, minioClient, redisTemplate, quotaDeductScript, rabbitTemplate);
         ReflectionTestUtils.setField(contractService, "bucket", "test-bucket");
     }
 
@@ -151,26 +156,17 @@ class ContractServiceImplTest {
     }
 
     @Test
-    @DisplayName("提交成功（含异步审查完整链路）")
-    void testSubmitSuccess() throws Exception {
+    @DisplayName("提交成功（发送 MQ 消息）")
+    void testSubmitSuccess() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(5);
-        when(valueOps.decrement("user:quota:" + userId)).thenReturn(4L);
-        when(llmReviewService.reviewContract(anyString())).thenReturn("{}");
-
-        Map<String, Object> llmResult = new HashMap<>();
-        llmResult.put("summary", "");
-        llmResult.put("riskCount", Map.of("high", 0, "medium", 0, "low", 0));
-        llmResult.put("risks", List.of());
-        when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(llmResult);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(4L);
 
         contractService.submit(taskId, userId);
 
-        assertEquals("SUCCESS", task.getStatus());
-        assertEquals(100, task.getProgress());
-        verify(valueOps).decrement("user:quota:" + userId);
-        verify(reportMapper).insert(any(ReviewReport.class));
+        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1));
+        verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessage.class));
     }
 
     @Test
@@ -212,7 +208,9 @@ class ContractServiceImplTest {
     void testSubmitNoQuotaInRedisAndUserNotFound() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(null);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(-1L);
+        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(false);
         when(userMapper.selectById(userId)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -225,7 +223,13 @@ class ContractServiceImplTest {
     void testSubmitQuotaInsufficient() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(valueOps.get("user:quota:" + userId)).thenReturn(0);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+                .thenReturn(-1L);
+        User user = new User();
+        user.setId(userId);
+        user.setReviewQuota(0);
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(true);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.submit(taskId, userId));
@@ -343,7 +347,7 @@ class ContractServiceImplTest {
         pageResult.setRecords(List.of(task));
         when(taskMapper.selectPage(any(), any())).thenReturn(pageResult);
 
-        HistoryResponse resp = contractService.getHistory(userId, 1, 10);
+        HistoryResponse resp = contractService.getHistory(userId, 1, 10, null);
 
         assertEquals(1, resp.getTasks().size());
         assertEquals(taskId, resp.getTasks().get(0).getTaskId());
@@ -354,7 +358,7 @@ class ContractServiceImplTest {
     // ==================== retry ====================
 
     @Test
-    @DisplayName("重试成功")
+    @DisplayName("重试成功（发送 MQ 消息）")
     void testRetrySuccess() {
         ReviewTask task = createPendingTask();
         task.setStatus("FAILED");
@@ -369,6 +373,7 @@ class ContractServiceImplTest {
         assertNull(task.getErrorMsg());
         assertNull(task.getCompletedAt());
         verify(taskMapper).updateById(task);
+        verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessage.class));
     }
 
     @Test
@@ -389,82 +394,5 @@ class ContractServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.retry(taskId, userId));
         assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
-    }
-
-    // ==================== startReviewAsync ====================
-
-    @Test
-    @DisplayName("异步审查成功（含 saveReviewResult 完整路径）")
-    void testStartReviewAsyncSuccess() throws Exception {
-        ReviewTask task = createPendingTask();
-        task.setStatus("PROCESSING");
-        when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(llmReviewService.reviewContract("合同内容")).thenReturn("{\"json\":\"ok\"}");
-
-        Map<String, Object> llmResult = new HashMap<>();
-        llmResult.put("summary", "审查总结");
-        llmResult.put("riskCount", Map.of("high", 1, "medium", 0, "low", 0));
-        Map<String, Object> riskMap = new HashMap<>();
-        riskMap.put("clauseIndex", 1);
-        riskMap.put("clauseContent", "条款内容");
-        riskMap.put("riskLevel", "HIGH");
-        riskMap.put("riskType", "违约金");
-        riskMap.put("description", "风险描述");
-        riskMap.put("suggestion", "修改建议");
-        riskMap.put("relatedLaws", List.of("民法典第585条"));
-        llmResult.put("risks", List.of(riskMap));
-
-        when(objectMapper.readValue(anyString(), eq(Map.class))).thenReturn(llmResult);
-
-        contractService.startReviewAsync(taskId, userId);
-
-        assertEquals("SUCCESS", task.getStatus());
-        assertEquals(100, task.getProgress());
-        assertNotNull(task.getCompletedAt());
-        verify(taskMapper, atLeast(3)).updateById(task);
-        verify(riskItemMapper).insert(any(RiskItem.class));
-        verify(reportMapper).insert(any(ReviewReport.class));
-    }
-
-    @Test
-    @DisplayName("异步审查 LLM 失败时回滚配额")
-    void testStartReviewAsyncLLMFailsAndQuotaRollback() {
-        ReviewTask task = createPendingTask();
-        task.setStatus("PROCESSING");
-        when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(llmReviewService.reviewContract(anyString())).thenThrow(new RuntimeException("LLM API error"));
-
-        User user = new User();
-        user.setId(userId);
-        user.setReviewQuota(5);
-        when(userMapper.selectById(userId)).thenReturn(user);
-
-        contractService.startReviewAsync(taskId, userId);
-
-        assertEquals("FAILED", task.getStatus());
-        assertEquals(-1, task.getProgress());
-        assertEquals("LLM API error", task.getErrorMsg());
-        assertNotNull(task.getCompletedAt());
-        verify(valueOps).increment("user:quota:" + userId);
-        assertEquals(6, user.getReviewQuota().intValue());
-        verify(userMapper).updateById(user);
-    }
-
-    @Test
-    @DisplayName("异步审查 LLM 返回无效 JSON 时使用 fallback")
-    void testStartReviewAsyncLLMReturnsInvalidJson() throws Exception {
-        ReviewTask task = createPendingTask();
-        task.setStatus("PROCESSING");
-        when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(llmReviewService.reviewContract(anyString())).thenReturn("not json");
-        when(objectMapper.readValue(anyString(), eq(Map.class)))
-                .thenThrow(new RuntimeException("Invalid JSON"));
-
-        contractService.startReviewAsync(taskId, userId);
-
-        assertEquals("SUCCESS", task.getStatus());
-        assertEquals(100, task.getProgress());
-        verify(reportMapper).insert(any(ReviewReport.class));
-        verify(riskItemMapper, never()).insert(any(RiskItem.class));
     }
 }

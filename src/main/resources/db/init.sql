@@ -72,3 +72,29 @@ CREATE TABLE IF NOT EXISTS `review_report` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_task_id` (`task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 审查过程日志表
+CREATE TABLE IF NOT EXISTS `review_process_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `task_id` BIGINT NOT NULL,
+    `agent` VARCHAR(50) NOT NULL COMMENT 'Agent 名称（如 Agent-A 合同分类）',
+    `content` TEXT NOT NULL COMMENT 'Agent 输出内容',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_task_id` (`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 操作日志表
+CREATE TABLE IF NOT EXISTS `operation_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `action` VARCHAR(50) NOT NULL COMMENT 'REGISTER / UPLOAD / SUBMIT / VIEW_REPORT / RETRY',
+    `task_id` BIGINT NULL,
+    `detail` JSON NULL,
+    `ip_address` VARCHAR(45) NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_action` (`action`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

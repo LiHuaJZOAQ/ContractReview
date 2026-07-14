@@ -3,12 +3,14 @@ package com.contractreview.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.contractreview.common.BusinessException;
+import com.contractreview.config.RabbitMqConfig;
 import com.contractreview.domain.dto.*;
 import com.contractreview.domain.entity.ReviewReport;
 import com.contractreview.domain.entity.ReviewTask;
 import com.contractreview.domain.entity.RiskItem;
 import com.contractreview.domain.entity.User;
 import com.contractreview.domain.enums.ErrorCode;
+import com.contractreview.domain.entity.ReviewProcessLog;
 import com.contractreview.mapper.*;
 import com.contractreview.service.ContractService;
 import com.contractreview.util.DesensitizationUtil;
@@ -22,9 +24,10 @@ import io.minio.MakeBucketArgs;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,9 +49,11 @@ public class ContractServiceImpl implements ContractService {
     private final RiskItemMapper riskItemMapper;
     private final ReviewReportMapper reportMapper;
     private final UserMapper userMapper;
+    private final ReviewProcessLogMapper processLogMapper;
     private final MinioClient minioClient;
     private final RedisTemplate<String, Object> redisTemplate;
-    private final LLMReviewService llmReviewService;
+    private final DefaultRedisScript<Long> quotaDeductScript;
+    private final RabbitTemplate rabbitTemplate;
 
     @Value("${minio.bucket}")
     private String bucket;
@@ -119,66 +124,25 @@ public class ContractServiceImpl implements ContractService {
         }
 
         String quotaKey = "user:quota:" + userId;
-        Integer quota = (Integer) redisTemplate.opsForValue().get(quotaKey);
-        if (quota == null) {
+        Long newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
+        if (newQuota == null || newQuota < 0) {
             User user = userMapper.selectById(userId);
             if (user == null) {
                 throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
             }
-            quota = user.getReviewQuota();
-            redisTemplate.opsForValue().set(quotaKey, quota);
-        }
-        if (quota <= 0) {
-            throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
-        }
-        redisTemplate.opsForValue().decrement(quotaKey);
-
-        task.setStatus("PROCESSING");
-        task.setProgress(5);
-        taskMapper.updateById(task);
-
-        startReviewAsync(taskId, userId);
-    }
-
-    @Async("taskExecutor")
-    public void startReviewAsync(Long taskId, Long userId) {
-        try {
-            ReviewTask task = taskMapper.selectById(taskId);
-            task.setProgress(30);
-            taskMapper.updateById(task);
-
-            String text = task.getPreviewText();
-            String result = llmReviewService.reviewContract(text);
-
-            task.setProgress(70);
-            taskMapper.updateById(task);
-
-            saveReviewResult(taskId, result);
-
-            task.setStatus("SUCCESS");
-            task.setProgress(100);
-            task.setCompletedAt(LocalDateTime.now());
-            taskMapper.updateById(task);
-        } catch (Exception e) {
-            log.error("Review failed for task {}: {}", taskId, e.getMessage());
-            ReviewTask task = taskMapper.selectById(taskId);
-            if (task != null) {
-                task.setStatus("FAILED");
-                task.setProgress(-1);
-                task.setErrorMsg(e.getMessage());
-                task.setCompletedAt(LocalDateTime.now());
-                taskMapper.updateById(task);
-
-                String quotaKey = "user:quota:" + userId;
-                redisTemplate.opsForValue().increment(quotaKey);
-
-                User user = userMapper.selectById(userId);
-                if (user != null) {
-                    user.setReviewQuota(user.getReviewQuota() + 1);
-                    userMapper.updateById(user);
-                }
+            if (!redisTemplate.hasKey(quotaKey)) {
+                redisTemplate.opsForValue().set(quotaKey, user.getReviewQuota());
+                newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
+            }
+            if (newQuota == null || newQuota < 0) {
+                throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
             }
         }
+
+        ReviewMessage message = new ReviewMessage(taskId, userId, 0);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,
+                RabbitMqConfig.ROUTING_KEY, message);
+        log.info("Sent review message to MQ: taskId={}, userId={}", taskId, userId);
     }
 
     @SuppressWarnings("unchecked")
@@ -190,22 +154,10 @@ public class ContractServiceImpl implements ContractService {
             log.warn("LLM result may not be valid JSON, storing raw: {}", e.getMessage());
             result = new HashMap<>();
             result.put("summary", llmResult);
-            result.put("riskCount", Map.of("high", 0, "medium", 0, "low", 0));
             result.put("risks", List.of());
         }
 
         String summary = (String) result.getOrDefault("summary", "");
-
-        Map<String, Integer> riskCount;
-        Object rc = result.get("riskCount");
-        if (rc instanceof Map) {
-            riskCount = (Map<String, Integer>) rc;
-        } else {
-            riskCount = new HashMap<>();
-            riskCount.put("high", 0);
-            riskCount.put("medium", 0);
-            riskCount.put("low", 0);
-        }
 
         List<Map<String, Object>> risks;
         Object r = result.get("risks");
@@ -215,6 +167,7 @@ public class ContractServiceImpl implements ContractService {
             risks = List.of();
         }
 
+        int high = 0, medium = 0, low = 0;
         for (Map<String, Object> riskMap : risks) {
             RiskItem item = new RiskItem();
             item.setTaskId(taskId);
@@ -233,14 +186,21 @@ public class ContractServiceImpl implements ContractService {
                 }
             }
             riskItemMapper.insert(item);
+
+            String level = ((String) riskMap.getOrDefault("riskLevel", "LOW")).toUpperCase();
+            switch (level) {
+                case "HIGH": high++; break;
+                case "MEDIUM": medium++; break;
+                default: low++;
+            }
         }
 
         ReviewReport report = new ReviewReport();
         report.setTaskId(taskId);
         report.setSummary(summary);
-        report.setRiskCountHigh(riskCount.getOrDefault("high", 0));
-        report.setRiskCountMedium(riskCount.getOrDefault("medium", 0));
-        report.setRiskCountLow(riskCount.getOrDefault("low", 0));
+        report.setRiskCountHigh(high);
+        report.setRiskCountMedium(medium);
+        report.setRiskCountLow(low);
         try {
             report.setReportJson(objectMapper.writeValueAsString(result));
         } catch (Exception e) {
@@ -299,12 +259,19 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
-    public HistoryResponse getHistory(Long userId, int page, int size) {
+    public HistoryResponse getHistory(Long userId, int page, int size, String status) {
         Page<ReviewTask> pageObj = new Page<>(page, size);
-        Page<ReviewTask> result = taskMapper.selectPage(pageObj,
-                new LambdaQueryWrapper<ReviewTask>()
-                        .eq(ReviewTask::getUserId, userId)
-                        .orderByDesc(ReviewTask::getCreatedAt));
+        LambdaQueryWrapper<ReviewTask> wrapper = new LambdaQueryWrapper<ReviewTask>()
+                .eq(ReviewTask::getUserId, userId);
+        if (status != null && !status.isEmpty() && !"ALL".equals(status)) {
+            String[] statuses = status.split(",");
+            if (statuses.length == 1) {
+                wrapper.eq(ReviewTask::getStatus, statuses[0]);
+            } else {
+                wrapper.in(ReviewTask::getStatus, (Object[]) statuses);
+            }
+        }
+        Page<ReviewTask> result = taskMapper.selectPage(pageObj, wrapper.orderByDesc(ReviewTask::getCreatedAt));
 
         List<HistoryResponse.HistoryItem> items = result.getRecords().stream()
                 .map(t -> new HistoryResponse.HistoryItem(
@@ -314,6 +281,32 @@ public class ContractServiceImpl implements ContractService {
                 .collect(Collectors.toList());
 
         return new HistoryResponse(items, result.getTotal(), page, size);
+    }
+
+    @Override
+    public String getPreviewText(Long taskId, Long userId) {
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        return task.getPreviewText();
+    }
+
+    @Override
+    public List<ContractService.ReviewProcessLogDto> getProcessLogs(Long taskId, Long userId) {
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        List<ReviewProcessLog> logs = processLogMapper.selectList(
+                new LambdaQueryWrapper<ReviewProcessLog>()
+                        .eq(ReviewProcessLog::getTaskId, taskId)
+                        .orderByAsc(ReviewProcessLog::getCreatedAt));
+        return logs.stream()
+                .map(l -> new ContractService.ReviewProcessLogDto(
+                        l.getAgent(), l.getContent(),
+                        l.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -332,5 +325,10 @@ public class ContractServiceImpl implements ContractService {
         task.setErrorMsg(null);
         task.setCompletedAt(null);
         taskMapper.updateById(task);
+
+        ReviewMessage message = new ReviewMessage(taskId, userId, 0);
+        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,
+                RabbitMqConfig.ROUTING_KEY, message);
+        log.info("Re-queued task {} via retry", taskId);
     }
 }

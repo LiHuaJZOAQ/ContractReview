@@ -3,17 +3,36 @@ spring:
     name: contract-review
   profiles:
     active: dev
-
   servlet:
     multipart:
       max-file-size: 20MB
       max-request-size: 25MB
-
+  ai:
+    vectorstore:
+      chroma:
+        host: http://localhost:8000
 server:
   port: 8080
 
+jwt:
+  secret: ContractReviewSecretKeyForJWT2026VeryLongString
+  access-token-expiration: 7200000
+  refresh-token-expiration: 2592000000
+
 contract:
+  rate-limit:
+    max-per-minute: 30
   review:
     max-retry-count: 3
     desensitize:
       enable: true
+    law:
+      seed-enabled: true
+    rag:
+      similarity-threshold: 0.75
+      network-cache-ttl-days: 7
+      timeout-seconds:
+        parsing: 30
+        retrieving: 30
+        reviewing: 120
+        summarizing: 30
