@@ -48,6 +48,7 @@ class ContractServiceImplTest {
     @Mock private RiskItemMapper riskItemMapper;
     @Mock private ReviewReportMapper reportMapper;
     @Mock private UserMapper userMapper;
+    @Mock private ReviewProcessLogMapper processLogMapper;
     @Mock private MinioClient minioClient;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private DefaultRedisScript<Long> quotaDeductScript;
@@ -66,7 +67,7 @@ class ContractServiceImplTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         contractService = new ContractServiceImpl(
                 objectMapper, fileUtil, taskMapper, riskItemMapper,
-                reportMapper, userMapper, minioClient, redisTemplate, quotaDeductScript, rabbitTemplate);
+                reportMapper, userMapper, processLogMapper, minioClient, redisTemplate, quotaDeductScript, rabbitTemplate);
         ReflectionTestUtils.setField(contractService, "bucket", "test-bucket");
     }
 
@@ -346,7 +347,7 @@ class ContractServiceImplTest {
         pageResult.setRecords(List.of(task));
         when(taskMapper.selectPage(any(), any())).thenReturn(pageResult);
 
-        HistoryResponse resp = contractService.getHistory(userId, 1, 10);
+        HistoryResponse resp = contractService.getHistory(userId, 1, 10, null);
 
         assertEquals(1, resp.getTasks().size());
         assertEquals(taskId, resp.getTasks().get(0).getTaskId());
