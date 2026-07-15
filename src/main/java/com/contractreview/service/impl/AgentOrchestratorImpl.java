@@ -78,6 +78,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                             log.info("Agent B scanning chunk {}/{}", index + 1, totalChunks);
                             List<String> laws = ragService.retrieveRelevantLaws(chunk);
                             List<Map<String, Object>> risks = agentService.scanRisks(chunk, laws, strategy);
+                            enrichRiskLaws(risks, laws);
                             if (!risks.isEmpty()) {
                                 String output = "第" + (index + 1) + "条发现 " + risks.size() + " 个风险:\n";
                                 for (Map<String, Object> r : risks) {
@@ -144,6 +145,29 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             processLogMapper.insert(log);
         } catch (Exception e) {
             log.warn("Failed to save process log for task {}: {}", taskId, e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void enrichRiskLaws(List<Map<String, Object>> risks, List<String> ragLaws) {
+        for (Map<String, Object> risk : risks) {
+            Object raw = risk.get("relatedLaws");
+            if (!(raw instanceof List)) continue;
+            List<String> riskLaws = (List<String>) raw;
+            if (riskLaws.isEmpty()) continue;
+            List<String> enriched = new ArrayList<>();
+            for (String law : riskLaws) {
+                if (law.contains("：") || law.contains(":")) {
+                    enriched.add(law);
+                } else {
+                    String full = ragLaws.stream()
+                            .filter(rl -> rl.startsWith(law))
+                            .findFirst()
+                            .orElse(law);
+                    enriched.add(full);
+                }
+            }
+            risk.put("relatedLaws", enriched);
         }
     }
 }

@@ -35,26 +35,27 @@ public class AgentServiceImpl implements AgentService {
             """;
 
     private static final String SCAN_PROMPT = """
-            你是一位专业的合同审查律师。请审查以下条款内容，识别其中的风险点。
-            
-            审查策略：%s
-            相关法条：%s
-            
-            请输出 JSON 数组格式的风险项，每个风险项包含：
-            {
-              "clauseIndex": 1,
-              "clauseContent": "条款原文",
-              "riskLevel": "HIGH/MEDIUM/LOW",
-              "riskType": "违约金/免责/管辖/其他",
-              "description": "风险描述",
-              "suggestion": "修改建议",
-              "relatedLaws": ["相关法条"]
-            }
-            
-            如果没有风险，返回空数组。
-            
-            条款内容：
-            %s
+             你是一位专业的合同审查律师。请审查以下条款内容，识别其中的风险点。
+             
+             审查策略：%s
+             相关法条：%s
+             
+             请输出 JSON 数组格式的风险项，每个风险项包含：
+             {
+               "clauseIndex": 1,
+               "clauseContent": "条款原文",
+               "riskLevel": "HIGH/MEDIUM/LOW",
+               "riskType": "违约金/免责/管辖/其他",
+               "description": "风险描述",
+               "suggestion": "修改建议",
+               "relatedLaws": ["《法律名称》第X条：具体法律条文内容，必须包含完整的核心内容摘要，不能只写法律名称"]
+             }
+             
+             重要：relatedLaws 必须包含具体的法条核心内容，不能只写法律名称。
+             如果没有风险，返回空数组。
+             
+             条款内容：
+             %s
             """;
 
     private static final String SUMMARIZE_PROMPT = """

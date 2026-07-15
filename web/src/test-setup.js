@@ -34,6 +34,7 @@ config.global.stubs = {
   'el-header': slotStub('div'),
   'el-main': slotStub('div'),
   'el-container': slotStub('div'),
+  'el-popover': { template: '<div class="el-popover-stub"><slot /><slot name="reference" /></div>' },
 }
 
 config.global.mocks = {
