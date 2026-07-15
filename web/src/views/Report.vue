@@ -30,7 +30,14 @@
                 <el-descriptions-item label="修改建议">{{ item.suggestion }}</el-descriptions-item>
                 <el-descriptions-item label="关联法条">
                   <span v-for="(law, li) in item.relatedLaws" :key="li">
-                    <el-tag size="small" effect="plain" style="margin:2px">{{ law }}</el-tag>
+                    <el-popover trigger="hover" placement="top" :width="400">
+                      <template #reference>
+                        <el-tag size="small" effect="plain" style="margin:2px; cursor:pointer">
+                          {{ law.split('：')[0] }}
+                        </el-tag>
+                      </template>
+                      <div style="font-size:13px; line-height:1.6">{{ law }}</div>
+                    </el-popover>
                   </span>
                   <span v-if="!item.relatedLaws?.length">无</span>
                 </el-descriptions-item>
