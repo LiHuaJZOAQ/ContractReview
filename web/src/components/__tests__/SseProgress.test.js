@@ -27,14 +27,14 @@ describe('SseProgress', () => {
   })
 
   it('renders hidden initially', () => {
-    expect(wrapper.find('.sse-progress').exists()).toBe(false)
+    expect(wrapper.find('.sse-panel').exists()).toBe(false)
   })
 
   it('opens SSE connection when open() is called', async () => {
     wrapper.vm.open()
     await nextTick()
 
-    expect(wrapper.find('.sse-progress').exists()).toBe(true)
+    expect(wrapper.find('.sse-panel').exists()).toBe(true)
     expect(EventSource).toHaveBeenCalledWith('/api/v1/contract/1/progress?token=test-token')
   })
 
@@ -42,7 +42,7 @@ describe('SseProgress', () => {
     wrapper.vm.open()
     await nextTick()
 
-    const stageLabels = wrapper.findAll('.stage-label').map(el => el.text())
+    const stageLabels = wrapper.findAll('.timeline-label').map(el => el.text())
     expect(stageLabels).toEqual(['解析文档', '检索法条', '审查条款', '汇总报告'])
   })
 
@@ -88,18 +88,17 @@ describe('SseProgress', () => {
   it('complete event sets 100% and emits complete', async () => {
     wrapper.vm.open()
     await nextTick()
-    wrapper.vm.complete = vi.fn()
 
     const completeCb = EventSourceMock.prototype.addEventListener.mock.calls.find(c => c[0] === 'complete')[1]
     completeCb({ data: JSON.stringify({}) })
     await nextTick()
 
     expect(wrapper.vm.percentage).toBe(100)
-    expect(wrapper.vm.progressStatus).toBe('success')
     expect(wrapper.vm.stages.every(s => s.status === 'done')).toBe(true)
+    expect(wrapper.emitted('complete')).toBeTruthy()
   })
 
-  it('error event sets progress to exception and emits error', async () => {
+  it('error event emits error', async () => {
     wrapper.vm.open()
     await nextTick()
 
@@ -111,7 +110,8 @@ describe('SseProgress', () => {
     errorCb({ data: JSON.stringify({ message: 'LLM API error' }) })
     await nextTick()
 
-    expect(wrapper.vm.progressStatus).toBe('exception')
+    expect(wrapper.emitted('error')).toBeTruthy()
+    expect(wrapper.emitted('error')[0]).toEqual(['LLM API error'])
   })
 
   it('llm_output event adds to outputs list', async () => {
@@ -145,7 +145,6 @@ describe('SseProgress', () => {
 
     wrapper.vm.reset()
     expect(wrapper.vm.percentage).toBe(0)
-    expect(wrapper.vm.progressStatus).toBe('')
     expect(wrapper.vm.visible).toBe(false)
     expect(wrapper.vm.stages.every(s => s.status === 'pending')).toBe(true)
     expect(wrapper.vm.outputs.length).toBe(0)

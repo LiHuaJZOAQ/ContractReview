@@ -6,6 +6,7 @@ const mockPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
   useRoute: () => ({ params: {} }),
+  RouterLink: { template: '<a><slot /></a>' },
 }))
 
 vi.mock('@element-plus/icons-vue', () => ({ User: {}, Lock: {} }))
@@ -29,10 +30,10 @@ describe('Login view', () => {
 
   it('renders login form', () => {
     const wrapper = mount(Login)
-    expect(wrapper.find('.login-container').exists()).toBe(true)
-    expect(wrapper.text()).toContain('智能合同风险审查系统')
+    expect(wrapper.find('.auth-page').exists()).toBe(true)
+    expect(wrapper.text()).toContain('智能合同风险审查')
     expect(wrapper.text()).toContain('登录')
-    expect(wrapper.text()).toContain('注册账号')
+    expect(wrapper.text()).toContain('注册')
   })
 
   it('has username and password fields', () => {
@@ -69,6 +70,6 @@ describe('Login view', () => {
 
   it('shows register link', () => {
     const wrapper = mount(Login)
-    expect(wrapper.text()).toContain('注册账号')
+    expect(wrapper.text()).toContain('注册')
   })
 })

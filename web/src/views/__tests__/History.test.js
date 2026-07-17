@@ -31,11 +31,11 @@ describe('History view', () => {
     expect(wrapper.text()).toContain('审查历史')
   })
 
-  it('has 4 filter tabs', () => {
+  it('has 4 filter buttons', () => {
     const wrapper = mount(History)
-    const tabs = wrapper.findAllComponents({ name: 'ElTabPaneStub' })
-    expect(tabs.length).toBe(4)
-    const labels = tabs.map(t => t.text())
+    const buttons = wrapper.findAll('.segment-btn')
+    expect(buttons.length).toBe(4)
+    const labels = buttons.map(t => t.text())
     expect(labels).toContain('全部')
     expect(labels).toContain('进行中')
     expect(labels).toContain('已完成')
@@ -70,12 +70,12 @@ describe('History view', () => {
     expect(wrapper.vm.statusLabel('UNKNOWN')).toBe('UNKNOWN')
   })
 
-  it('statusTagType returns correct types', () => {
+  it('statusClass returns correct classes', () => {
     const wrapper = mount(History)
-    expect(wrapper.vm.statusTagType('SUCCESS')).toBe('success')
-    expect(wrapper.vm.statusTagType('FAILED')).toBe('danger')
-    expect(wrapper.vm.statusTagType('PENDING')).toBe('info')
-    expect(wrapper.vm.statusTagType('PARSING')).toBe('warning')
+    expect(wrapper.vm.statusClass('SUCCESS')).toBe('success')
+    expect(wrapper.vm.statusClass('FAILED')).toBe('danger')
+    expect(wrapper.vm.statusClass('PENDING')).toBe('pending')
+    expect(wrapper.vm.statusClass('PARSING')).toBe('processing')
   })
 
   it('isProcessing returns true for in-progress statuses', () => {

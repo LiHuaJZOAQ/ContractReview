@@ -63,29 +63,28 @@ describe('Report view', () => {
     expect(wrapper.vm.logs.length).toBe(1)
   })
 
-  it('riskTagType maps levels correctly', () => {
+  it('riskLabel maps levels correctly', () => {
     mockGetReport.mockResolvedValue({ summary: '', riskCount: {}, risks: [] })
     const wrapper = mount(Report, {
       global: {
         mocks: { $route: { params: { taskId: '99' }, query: {} } }
       }
     })
-    expect(wrapper.vm.riskTagType('HIGH')).toBe('danger')
-    expect(wrapper.vm.riskTagType('MEDIUM')).toBe('warning')
-    expect(wrapper.vm.riskTagType('LOW')).toBe('info')
-    expect(wrapper.vm.riskTagType('UNKNOWN')).toBe('info')
+    expect(wrapper.vm.riskLabel('HIGH')).toBe('高危')
+    expect(wrapper.vm.riskLabel('MEDIUM')).toBe('中危')
+    expect(wrapper.vm.riskLabel('LOW')).toBe('低危')
+    expect(wrapper.vm.riskLabel('UNKNOWN')).toBe('UNKNOWN')
   })
 
-  it('has 3 tab panes', async () => {
+  it('has 3 tab buttons', async () => {
     mockGetReport.mockResolvedValue({ summary: '', riskCount: {}, risks: [] })
     const wrapper = mount(Report, {
       global: {
         mocks: { $route: { params: { taskId: '99' }, query: {} } }
       }
     })
-    // Wait for onMounted to set loading=false
     await new Promise(r => setTimeout(r, 50))
-    const tabs = wrapper.findAllComponents({ name: 'ElTabPaneStub' })
+    const tabs = wrapper.findAll('.tab-btn')
     expect(tabs.length).toBe(3)
     const labels = tabs.map(t => t.text())
     expect(labels).toContain('审查报告')
