@@ -252,7 +252,7 @@ onMounted(fetchHistory)
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
 }
 .segment-btn:hover {
   color: var(--color-text-primary);
@@ -377,7 +377,7 @@ onMounted(fetchHistory)
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
 }
 .action-link:hover {
   background: var(--color-accent-light);
@@ -412,7 +412,7 @@ onMounted(fetchHistory)
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
 }
 .page-btn:hover:not(:disabled):not(.active) {
   background: var(--color-bg-hover);

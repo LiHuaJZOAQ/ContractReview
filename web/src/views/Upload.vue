@@ -346,7 +346,7 @@ function onError(msg) {
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
 }
 .btn:disabled {
   opacity: 0.6;

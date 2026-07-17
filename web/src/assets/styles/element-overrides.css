@@ -48,7 +48,7 @@
   --el-border-radius-round: var(--radius-full);
   --el-border-radius-circle: 100%;
 
-  --el-font-family: var(--font-family);
+  --el-font-family: var(--font-ui);
   --el-font-size-base: var(--text-base);
   --el-font-size-small: var(--text-sm);
   --el-font-size-extra-small: var(--text-xs);
@@ -128,7 +128,7 @@
   border-color: var(--color-accent) !important;
 }
 .el-input__inner {
-  font-family: var(--font-family) !important;
+  font-family: var(--font-ui) !important;
   height: 36px;
   line-height: 36px;
 }
