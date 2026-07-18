@@ -269,6 +269,16 @@
   color: var(--color-text-primary);
 }
 
+/* 侧边栏用户下拉菜单：与用户卡片等宽 */
+.user-card-popper {
+  width: calc(var(--sidebar-width) - var(--space-4) * 2);
+  box-sizing: border-box;
+}
+.user-card-popper .el-dropdown-menu {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .el-descriptions {
   --el-descriptions-item-bordered-label-background: var(--color-bg-secondary);
 }

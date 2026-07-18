@@ -3,7 +3,12 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <transition name="fade">
-          <img v-if="!sidebarCollapsed" src="@/assets/logo.svg" alt="Logo" class="brand-icon" />
+          <svg v-if="!sidebarCollapsed" class="brand-icon" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2L4 7v7c0 5.25 4.25 10.74 10 12 5.75-1.26 10-6.75 10-12V7L14 2z"/>
+            <line x1="10" y1="11" x2="18" y2="11"/>
+            <line x1="10" y1="15" x2="18" y2="15"/>
+            <line x1="10" y1="19" x2="15" y2="19"/>
+          </svg>
         </transition>
         <transition name="fade">
           <span v-if="!sidebarCollapsed" class="brand-text">合同审查</span>
@@ -90,7 +95,10 @@
 
       <div class="sidebar-footer">
         <template v-if="!sidebarCollapsed">
-          <el-dropdown trigger="click" class="user-card-dropdown">
+          <div class="footer-actions">
+            <ThemeToggle mode="standalone" />
+          </div>
+          <el-dropdown trigger="click" class="user-card-dropdown" popper-class="user-card-popper">
             <button class="user-card">
               <span class="user-avatar">{{ userInitial }}</span>
               <span class="user-name">{{ auth.username || auth.userId }}</span>
@@ -103,27 +111,13 @@
                 <el-dropdown-item disabled>
                   <span style="color: var(--color-text-secondary)">{{ auth.username || auth.userId }}</span>
                 </el-dropdown-item>
+                <el-dropdown-item divided>
+                  <ThemeToggle mode="dropdown" />
+                </el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <div class="footer-actions">
-            <ThemeToggle class="footer-theme" />
-            <el-dropdown trigger="click">
-              <button class="menu-btn" title="更多菜单">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="3" y1="12" x2="21" y2="12"/>
-                  <line x1="3" y1="6" x2="21" y2="6"/>
-                  <line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-              </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
         </template>
         <template v-else>
           <button class="user-btn-collapsed" :title="auth.userId">
@@ -478,10 +472,17 @@ watch(
 .sidebar-footer {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 .app-layout.collapsed .sidebar-footer {
   display: flex;
   justify-content: center;
+}
+
+.footer-actions {
+  width: 100%;
 }
 
 .user-card-dropdown {
@@ -536,13 +537,6 @@ watch(
   color: var(--color-text-tertiary);
 }
 
-.footer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: var(--space-2);
-}
-
 .user-btn-collapsed {
   display: flex;
   align-items: center;
@@ -570,29 +564,6 @@ watch(
   justify-content: center;
   font-size: var(--text-sm);
   font-weight: 600;
-}
-
-.footer-theme {
-  width: 32px;
-  height: 32px;
-}
-
-.menu-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-.menu-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
 }
 
 .main-area {
