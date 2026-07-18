@@ -48,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         redisTemplate.opsForValue().set("refresh:token:" + refreshToken, user.getId().toString(), 30, TimeUnit.DAYS);
 
-        return buildAuthResponse(user.getId(), token, refreshToken);
+        return buildAuthResponse(user, token, refreshToken);
     }
 
     @Override
@@ -64,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         redisTemplate.opsForValue().set("refresh:token:" + refreshToken, user.getId().toString(), 30, TimeUnit.DAYS);
 
-        return buildAuthResponse(user.getId(), token, refreshToken);
+        return buildAuthResponse(user, token, refreshToken);
     }
 
     @Override
@@ -79,10 +79,11 @@ public class AuthServiceImpl implements AuthService {
                 Boolean firstReuse = redisTemplate.opsForValue().setIfAbsent(reuseKey, "1", 30, TimeUnit.DAYS);
                 if (Boolean.TRUE.equals(firstReuse)) {
                     log.warn("Refresh Token 已使用但 Redis 记录丢失，user={}，重新签发", userId);
+                    User user = userMapper.selectById(userId);
                     String newToken = jwtUtils.generateAccessToken(userId);
                     String newRefreshToken = jwtUtils.generateRefreshToken(userId);
                     redisTemplate.opsForValue().set("refresh:token:" + newRefreshToken, userId.toString(), 30, TimeUnit.DAYS);
-                    return buildAuthResponse(userId, newToken, newRefreshToken);
+                    return buildAuthResponse(user, newToken, newRefreshToken);
                 }
                 log.warn("疑似 Refresh Token 重用攻击，user={}", userId);
             }
@@ -91,14 +92,15 @@ public class AuthServiceImpl implements AuthService {
 
         redisTemplate.delete(key);
         Long userId = Long.valueOf(userIdStr);
+        User user = userMapper.selectById(userId);
         String newToken = jwtUtils.generateAccessToken(userId);
         String newRefreshToken = jwtUtils.generateRefreshToken(userId);
         redisTemplate.opsForValue().set("refresh:token:" + newRefreshToken, userId.toString(), 30, TimeUnit.DAYS);
 
-        return buildAuthResponse(userId, newToken, newRefreshToken);
+        return buildAuthResponse(user, newToken, newRefreshToken);
     }
 
-    private AuthResponse buildAuthResponse(Long userId, String token, String refreshToken) {
-        return new AuthResponse(userId, token, refreshToken, jwtUtils.getAccessTokenExpiration() / 1000);
+    private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
+        return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken, jwtUtils.getAccessTokenExpiration() / 1000);
     }
 }

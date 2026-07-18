@@ -6,6 +6,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
   const refreshTokenValue = ref(localStorage.getItem('refreshToken') || '')
   const userId = ref(localStorage.getItem('userId') || '')
+  const username = ref(localStorage.getItem('username') || '')
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -25,18 +26,22 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = data.token
     refreshTokenValue.value = data.refreshToken
     userId.value = data.userId
+    username.value = data.username || ''
     localStorage.setItem('token', data.token)
     localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('userId', data.userId)
+    localStorage.setItem('username', data.username || '')
   }
 
   function logout() {
     token.value = ''
     refreshTokenValue.value = ''
     userId.value = ''
+    username.value = ''
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userId')
+    localStorage.removeItem('username')
   }
 
   async function refresh() {
@@ -45,5 +50,5 @@ export const useAuthStore = defineStore('auth', () => {
     return res
   }
 
-  return { token, refreshTokenValue, userId, isAuthenticated, login, register, logout, refresh }
+  return { token, refreshTokenValue, userId, username, isAuthenticated, login, register, logout, refresh }
 })
