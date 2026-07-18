@@ -11,7 +11,7 @@
           </svg>
         </transition>
         <transition name="fade">
-          <span v-if="!sidebarCollapsed" class="brand-text">合同审查</span>
+          <span v-if="!sidebarCollapsed" class="brand-text">合同审查系统</span>
         </transition>
         <button class="collapse-toggle" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

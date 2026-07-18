@@ -4,7 +4,7 @@
       <div class="auth-logo">
         <img src="@/assets/logo.svg" alt="Logo" />
       </div>
-      <h1 class="auth-title">智能合同风险审查</h1>
+      <h1 class="auth-title">智能合同风险审查系统</h1>
       <p class="auth-subtitle">登录以继续使用</p>
 
       <el-form ref="formRef" :model="form" :rules="rules" class="auth-form" @submit.prevent="handleLogin">
