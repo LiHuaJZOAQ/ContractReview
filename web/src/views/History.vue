@@ -19,91 +19,108 @@
         </div>
       </div>
 
-      <div v-if="loading" class="loading-list">
-        <div v-for="i in 5" :key="i" class="skeleton" style="height: 56px; border-radius: var(--radius-md);" />
-      </div>
+      <transition name="list-fade" mode="out-in">
+        <div v-if="loading" key="loading" class="loading-list">
+          <div v-for="i in 5" :key="i" class="skeleton" style="height: 56px; border-radius: var(--radius-md);" />
+        </div>
 
-      <div v-else-if="tasks.length" class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th class="th-id">ID</th>
-              <th class="th-file">文件名</th>
-              <th class="th-status">状态</th>
-              <th class="th-time">创建时间</th>
-              <th class="th-action">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in tasks" :key="row.taskId" class="table-row">
-              <td class="td-id">{{ row.taskId }}</td>
-              <td class="td-file">
-                <span class="file-name-text">{{ row.fileName }}</span>
-              </td>
-              <td class="td-status">
-                <span class="status-badge" :class="'status-' + statusClass(row.status)">
-                  <span class="status-dot" />
-                  {{ statusLabel(row.status) }}
-                </span>
-              </td>
-              <td class="td-time">{{ row.createdAt }}</td>
-              <td class="td-action">
-                <button
-                  v-if="row.status === 'SUCCESS'"
-                  class="action-link"
-                  @click="$router.push(`/report/${row.taskId}`)"
-                >
-                  查看报告
-                </button>
-                <button
-                  v-if="row.status === 'FAILED'"
-                  class="action-link action-warning"
-                  @click="handleRetry(row)"
-                >
-                  重试
-                </button>
-                <button
-                  v-else-if="isProcessing(row.status)"
-                  class="action-link"
-                  @click="$router.push(`/report/${row.taskId}`)"
-                >
-                  查看进度
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <div v-else-if="tasks.length" :key="'t-' + statusFilter + '-' + page" class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="th-id">ID</th>
+                <th class="th-file">文件名</th>
+                <th class="th-status">状态</th>
+                <th class="th-time">创建时间</th>
+                <th class="th-action">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in tasks" :key="row.taskId" class="table-row">
+                <td class="td-id">{{ row.taskId }}</td>
+                <td class="td-file">
+                  <span class="file-name-text">{{ row.fileName }}</span>
+                </td>
+                <td class="td-status">
+                  <span class="status-badge" :class="'status-' + statusClass(row.status)">
+                    <span class="status-dot" />
+                    {{ statusLabel(row.status) }}
+                  </span>
+                </td>
+                <td class="td-time">{{ row.createdAt }}</td>
+                <td class="td-action">
+                  <button
+                    v-if="row.status === 'SUCCESS'"
+                    class="action-link"
+                    @click="$router.push(`/report/${row.taskId}`)"
+                  >
+                    查看报告
+                  </button>
+                  <button
+                    v-if="row.status === 'FAILED'"
+                    class="action-link action-warning"
+                    @click="handleRetry(row)"
+                  >
+                    重试
+                  </button>
+                  <button
+                    v-else-if="isProcessing(row.status)"
+                    class="action-link"
+                    @click="$router.push(`/report/${row.taskId}`)"
+                  >
+                    查看进度
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div v-else class="empty-state">
-        <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="8" y="6" width="32" height="36" rx="3"/>
-          <line x1="16" y1="16" x2="32" y2="16"/>
-          <line x1="16" y1="24" x2="28" y2="24"/>
-          <line x1="16" y1="32" x2="24" y2="32"/>
-        </svg>
-        <p>暂无审查记录</p>
-      </div>
+        <div v-else key="empty" class="empty-state">
+          <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="6" width="32" height="36" rx="3"/>
+            <line x1="16" y1="16" x2="32" y2="16"/>
+            <line x1="16" y1="24" x2="28" y2="24"/>
+            <line x1="16" y1="32" x2="24" y2="32"/>
+          </svg>
+          <p>暂无审查记录</p>
+        </div>
+      </transition>
 
-      <div v-if="total > size" class="pagination">
-        <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg>
-        </button>
-        <template v-for="p in pageNumbers" :key="p">
-          <span v-if="p === '...'" class="page-ellipsis">...</span>
-          <button
-            v-else
-            class="page-btn"
-            :class="{ active: p === page }"
-            @click="goPage(p)"
-          >
-            {{ p }}
+      <div class="pagination">
+        <div class="page-size-select">
+          <span class="page-size-label">每页</span>
+          <input
+            class="page-size-input"
+            type="number"
+            :value="size"
+            min="1"
+            max="100"
+            @change="changeSize($event.target.value)"
+            @keydown.enter="$event.target.blur()"
+          />
+          <span class="page-size-label">条</span>
+        </div>
+        <div class="page-btns">
+          <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg>
           </button>
-        </template>
-        <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9,6 15,12 9,18"/></svg>
-        </button>
-        <span class="page-total">共 {{ total }} 条</span>
+          <template v-for="p in pageNumbers" :key="p">
+            <span v-if="p === '...'" class="page-ellipsis">...</span>
+            <button
+              v-else
+              class="page-btn"
+              :class="{ active: p === page }"
+              @click="goPage(p)"
+            >
+              {{ p }}
+            </button>
+          </template>
+          <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9,6 15,12 9,18"/></svg>
+          </button>
+          <span class="page-total">共 {{ total }} 条</span>
+        </div>
       </div>
     </div>
   </div>
@@ -181,6 +198,13 @@ function switchFilter(val) {
 
 function goPage(p) {
   page.value = p
+  fetchHistory()
+}
+
+function changeSize(val) {
+  const n = Math.max(1, Math.min(100, parseInt(val, 10) || 10))
+  size.value = n
+  page.value = 1
   fetchHistory()
 }
 
@@ -392,10 +416,48 @@ onMounted(fetchHistory)
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
+  justify-content: space-between;
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border-light);
+}
+.page-btns {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.page-size-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.page-size-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-ui);
+}
+.page-size-input {
+  width: 48px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-ui);
+  text-align: center;
+  cursor: text;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  -moz-appearance: textfield;
+}
+.page-size-input::-webkit-outer-spin-button,
+.page-size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.page-size-input:hover,
+.page-size-input:focus {
+  border-color: var(--color-accent);
 }
 .page-btn {
   display: flex;
@@ -436,7 +498,7 @@ onMounted(fetchHistory)
   font-size: var(--text-sm);
 }
 .page-total {
-  margin-left: var(--space-4);
+  margin-left: var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text-tertiary);
 }
@@ -453,6 +515,20 @@ onMounted(fetchHistory)
   width: 48px;
   height: 48px;
   opacity: 0.4;
+}
+
+/* ——— 筛选切换内容过渡 ——— */
+.list-fade-enter-active,
+.list-fade-leave-active {
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+.list-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.list-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .loading-list {
