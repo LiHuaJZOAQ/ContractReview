@@ -1,27 +1,56 @@
 <template>
-  <div class="register-container">
-    <el-card class="register-card">
-      <template #header>
-        <h2>注册账号</h2>
-      </template>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0">
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <img src="@/assets/logo.svg" alt="Logo" />
+      </div>
+      <h1 class="auth-title">创建账号</h1>
+      <p class="auth-subtitle">注册后即可使用合同审查功能</p>
+
+      <el-form ref="formRef" :model="form" :rules="rules" class="auth-form" @submit.prevent="handleRegister">
         <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" />
+          <el-input
+            v-model="form.username"
+            placeholder="用户名"
+            size="large"
+            :prefix-icon="User"
+          />
         </el-form-item>
         <el-form-item prop="password">
-          <el-input v-model="form.password" type="password" placeholder="密码" :prefix-icon="Lock" show-password />
+          <el-input
+            v-model="form.password"
+            type="password"
+            placeholder="密码"
+            size="large"
+            :prefix-icon="Lock"
+            show-password
+          />
         </el-form-item>
         <el-form-item prop="confirmPassword">
-          <el-input v-model="form.confirmPassword" type="password" placeholder="确认密码" :prefix-icon="Lock" show-password />
+          <el-input
+            v-model="form.confirmPassword"
+            type="password"
+            placeholder="确认密码"
+            size="large"
+            :prefix-icon="Lock"
+            show-password
+          />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" style="width:100%" @click="handleRegister">注册</el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button style="width:100%" @click="$router.push('/login')">返回登录</el-button>
-        </el-form-item>
+        <el-button
+          type="primary"
+          size="large"
+          class="auth-btn"
+          :loading="loading"
+          @click="handleRegister"
+        >
+          注册
+        </el-button>
       </el-form>
-    </el-card>
+
+      <p class="auth-link">
+        已有账号？<router-link to="/login">登录</router-link>
+      </p>
+    </div>
   </div>
 </template>
 
@@ -53,8 +82,14 @@ const validatePass = (rule, value, callback) => {
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }, { min: 6, message: '密码至少6位', trigger: 'blur' }],
-  confirmPassword: [{ required: true, message: '请确认密码', trigger: 'blur' }, { validator: validatePass, trigger: 'blur' }]
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validatePass, trigger: 'blur' }
+  ]
 }
 
 async function handleRegister() {
@@ -74,18 +109,70 @@ async function handleRegister() {
 </script>
 
 <style scoped>
-.register-container {
+.auth-page {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  background: var(--color-bg-secondary);
+  padding: var(--space-6);
 }
-.register-card {
-  width: 400px;
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-10) var(--space-10) var(--space-8);
 }
-.register-card h2 {
+
+.auth-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+.auth-logo img {
+  width: 40px;
+  height: 40px;
+  color: var(--color-accent);
+}
+
+.auth-title {
   text-align: center;
-  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.auth-subtitle {
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-8);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-btn {
+  width: 100%;
+  margin-top: var(--space-2);
+  height: 44px;
+  font-size: var(--text-md);
+}
+
+.auth-link {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: var(--space-6) 0 0;
+}
+.auth-link a {
+  font-weight: 500;
 }
 </style>

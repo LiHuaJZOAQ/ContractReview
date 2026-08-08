@@ -6,6 +6,10 @@ import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
 import './api/interceptor'
+import './assets/styles/tokens.css'
+import './assets/styles/global.css'
+import './assets/styles/element-overrides.css'
+import './assets/styles/animations.css'
 
 const app = createApp(App)
 

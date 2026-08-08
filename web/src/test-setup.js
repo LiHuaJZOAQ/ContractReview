@@ -35,6 +35,10 @@ config.global.stubs = {
   'el-main': slotStub('div'),
   'el-container': slotStub('div'),
   'el-popover': { template: '<div class="el-popover-stub"><slot /><slot name="reference" /></div>' },
+  'el-dropdown': slotStub('div'),
+  'el-dropdown-menu': slotStub('div'),
+  'el-dropdown-item': slotStub('div'),
+  'router-link': { template: '<a><slot /></a>' },
 }
 
 config.global.mocks = {

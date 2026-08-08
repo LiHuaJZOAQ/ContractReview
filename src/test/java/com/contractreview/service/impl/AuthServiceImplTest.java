@@ -115,7 +115,12 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("Refresh Token 有效则返回新 Token")
     void testRefreshTokenSuccess() {
+        User user = new User();
+        user.setId(1L);
+        user.setUsername("testuser");
+
         when(valueOps.get("refresh:token:old-refresh")).thenReturn("1");
+        when(userMapper.selectById(1L)).thenReturn(user);
         when(jwtUtils.generateAccessToken(1L)).thenReturn("new-access");
         when(jwtUtils.generateRefreshToken(1L)).thenReturn("new-refresh");
 

@@ -1,32 +1,46 @@
 <template>
-  <div v-if="visible" class="sse-progress">
-    <div class="progress-header">
-      <span class="progress-title">审查进度</span>
-      <span v-if="timerRunning" class="timer">⏱ {{ elapsedStr }}</span>
+  <div v-if="visible" class="sse-panel">
+    <div class="sse-header">
+      <span class="sse-title">审查进度</span>
+      <span v-if="timerRunning" class="sse-timer">{{ elapsedStr }}</span>
     </div>
 
-    <el-progress :percentage="percentage" :status="progressStatus" :stroke-width="16" />
+    <div class="progress-track">
+      <div class="progress-fill" :style="{ width: percentage + '%' }" :class="{ complete: percentage >= 100 }" />
+    </div>
 
-    <div class="stage-list">
-      <div v-for="(stage, idx) in stages" :key="stage.key" class="stage-item" :class="stage.status">
-        <span v-if="stage.status === 'done'" class="stage-icon done-icon">✓</span>
-        <span v-else-if="stage.status === 'active'" class="stage-icon active-icon">◉</span>
-        <span v-else-if="stage.status === 'error'" class="stage-icon error-icon">✕</span>
-        <span v-else class="stage-icon pending-icon">○</span>
-        <span class="stage-label">{{ stage.label }}</span>
-        <span v-if="stage.detail" class="stage-detail">{{ stage.detail }}</span>
-        <span v-if="idx < stages.length" class="stage-line" :class="stage.status"></span>
+    <div class="timeline">
+      <div
+        v-for="(stage, idx) in stages"
+        :key="stage.key"
+        class="timeline-item"
+        :class="stage.status"
+      >
+        <div class="timeline-marker">
+          <svg v-if="stage.status === 'done'" class="marker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20,6 9,17 4,12"/>
+          </svg>
+          <svg v-else-if="stage.status === 'error'" class="marker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          <span v-else class="marker-dot" />
+        </div>
+        <div class="timeline-content">
+          <span class="timeline-label">{{ stage.label }}</span>
+          <span v-if="stage.detail" class="timeline-detail">{{ stage.detail }}</span>
+        </div>
+        <div v-if="idx < stages.length - 1" class="timeline-line" :class="stage.status" />
       </div>
     </div>
 
     <div v-if="outputs.length" class="output-area">
-      <div class="output-title">
-        审查中间结果
+      <div class="output-header">
+        <span class="output-title">中间结果</span>
         <span class="output-count">{{ outputs.length }} 条</span>
       </div>
-      <div class="output-content" ref="outputRef">
-        <div v-for="(item, i) in outputs" :key="i" class="output-line">
-          <div class="output-agent">▶ {{ item.agent }}</div>
+      <div class="output-body" ref="outputRef">
+        <div v-for="(item, i) in outputs" :key="i" class="output-item">
+          <span class="output-agent">{{ item.agent }}</span>
           <pre class="output-text">{{ item.content }}</pre>
         </div>
       </div>
@@ -35,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   taskId: { type: [Number, String], required: true }
@@ -45,7 +59,6 @@ const emit = defineEmits(['complete', 'error'])
 
 const visible = ref(false)
 const percentage = ref(0)
-const progressStatus = ref('')
 const outputs = ref([])
 const outputRef = ref(null)
 
@@ -85,7 +98,7 @@ function stopTimer() {
     timerInterval = null
   }
   if (startTime) {
-    elapsedStr.value = formatTime(Math.floor((Date.now() - startTime) / 1000)) + ' ✓'
+    elapsedStr.value = formatTime(Math.floor((Date.now() - startTime) / 1000))
   }
 }
 
@@ -98,7 +111,6 @@ function reset() {
   })
   outputs.value = []
   percentage.value = 0
-  progressStatus.value = ''
   elapsedStr.value = '00:00'
 }
 
@@ -137,9 +149,8 @@ function open() {
     })
   })
 
-  eventSource.addEventListener('complete', e => {
+  eventSource.addEventListener('complete', () => {
     percentage.value = 100
-    progressStatus.value = 'success'
     stages.value.forEach(s => { s.status = 'done' })
     stopTimer()
     emit('complete')
@@ -151,7 +162,6 @@ function open() {
       const data = JSON.parse(e.data)
       msg = data.message || msg
     } catch {}
-    progressStatus.value = 'exception'
     const activeStage = stages.value.find(s => s.status === 'active')
     if (activeStage) activeStage.status = 'error'
     stopTimer()
@@ -159,8 +169,7 @@ function open() {
   })
 
   eventSource.onerror = () => {
-    if (progressStatus.value === '') {
-      progressStatus.value = 'exception'
+    if (timerRunning.value) {
       stopTimer()
       emit('error', '连接断开')
     }
@@ -176,142 +185,195 @@ function close() {
 }
 
 watch(() => props.taskId, () => { close() })
-
 onBeforeUnmount(close)
 
 defineExpose({ open, close })
 </script>
 
 <style scoped>
-.sse-progress {
-  margin-top: 20px;
-  padding: 20px;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  background: #fafafa;
+.sse-panel {
+  margin-top: var(--space-6);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
 }
-.progress-header {
+
+.sse-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-4);
 }
-.progress-title {
+.sse-title {
+  font-size: var(--text-md);
   font-weight: 600;
-  font-size: 15px;
+  color: var(--color-text-primary);
 }
-.timer {
-  font-size: 13px;
-  color: #909399;
+.sse-timer {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-.stage-list {
-  margin-top: 16px;
+
+.progress-track {
+  height: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-6);
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), #6ee7b7);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+}
+.progress-fill.complete {
+  background: var(--color-accent);
+}
+
+.timeline {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  position: relative;
 }
-.stage-item {
+
+.timeline-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #c0c4cc;
+  align-items: flex-start;
   position: relative;
+  min-height: 48px;
 }
-.stage-item.done {
-  color: #67c23a;
-}
-.stage-item.active {
-  color: #409eff;
-}
-.stage-item.error {
-  color: #f56c6c;
-}
-.stage-icon {
-  width: 18px;
-  height: 18px;
+
+.timeline-marker {
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
   flex-shrink: 0;
+  z-index: 1;
 }
-.done-icon {
-  color: #67c23a;
+.marker-icon {
+  width: 18px;
+  height: 18px;
 }
-.active-icon {
-  color: #409eff;
-  animation: pulse 1.2s ease-in-out infinite;
+.marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-base);
 }
-.error-icon {
-  color: #f56c6c;
+
+.timeline-item.done .marker-dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
-.pending-icon {
-  color: #c0c4cc;
+.timeline-item.active .marker-dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-light);
+  animation: pulse-dot 2s ease-in-out infinite;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+.timeline-item.error .marker-dot {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
 }
-.stage-label {
-  flex-shrink: 0;
+
+.timeline-item.done .marker-icon { color: var(--color-accent); }
+.timeline-item.error .marker-icon { color: var(--color-danger); }
+
+.timeline-content {
+  flex: 1;
+  padding: 2px 0 var(--space-2) var(--space-3);
+  min-width: 0;
 }
-.stage-detail {
-  font-size: 12px;
-  color: #909399;
-  margin-left: 4px;
+.timeline-label {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
 }
+.timeline-item.done .timeline-label { color: var(--color-text-secondary); }
+.timeline-item.active .timeline-label { color: var(--color-text-primary); font-weight: 600; }
+.timeline-item.error .timeline-label { color: var(--color-danger); }
+
+.timeline-detail {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 11px;
+  top: 24px;
+  bottom: -24px;
+  width: 2px;
+  background: var(--color-border-light);
+  transition: background var(--transition-fast);
+}
+.timeline-line.done { background: var(--color-accent); }
+.timeline-line.active { background: linear-gradient(to bottom, var(--color-accent), var(--color-border-light)); }
+
 .output-area {
-  margin-top: 16px;
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
-  background: #fff;
+  margin-top: var(--space-5);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
-.output-title {
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  border-bottom: 1px solid #e4e7ed;
-  background: #f5f7fa;
+.output-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.output-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 .output-count {
-  font-size: 12px;
-  font-weight: 400;
-  color: #909399;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
 }
-.output-content {
-  padding: 8px 12px;
-  max-height: 300px;
+.output-body {
+  padding: var(--space-3) var(--space-4);
+  max-height: 280px;
   overflow-y: auto;
-  font-size: 13px;
+  background: var(--color-bg-tertiary);
 }
-.output-line {
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed #eee;
+.output-item {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px dashed var(--color-border-light);
 }
-.output-line:last-child {
+.output-item:last-child {
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
 }
 .output-agent {
+  display: inline-block;
+  font-size: var(--text-xs);
   font-weight: 600;
-  color: #409eff;
-  margin-bottom: 4px;
+  color: var(--color-accent-text);
+  margin-bottom: var(--space-1);
 }
 .output-text {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #333;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: 'Microsoft YaHei', sans-serif;
+  font-family: var(--font-mono);
 }
 </style>
