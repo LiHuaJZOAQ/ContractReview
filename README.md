@@ -20,7 +20,6 @@
 - [项目结构](#项目结构)
 - [前置要求](#前置要求)
 - [快速开始](#快速开始)
-- [前端开发](#前端开发)
 - [API 文档](#api-文档)
 - [测试](#测试)
 - [开发路线](#开发路线)
@@ -135,7 +134,27 @@ mvn spring-boot:run
 
 服务启动后访问 `http://localhost:8080`。
 
-### 5. 验证
+### 5. 运行前端
+
+```bash
+cd web
+
+# 安装依赖
+npm install
+
+# 开发模式
+npm run dev
+
+# 构建
+# npm run build
+
+# 运行测试
+# npm test
+```
+
+开发环境下默认访问 `http://localhost:5173`。
+
+### CURL验证
 
 ```bash
 # 注册
@@ -149,23 +168,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"username":"test","password":"123456"}'
 ```
 
-## 前端开发
 
-```bash
-cd web
-
-# 安装依赖
-npm install
-
-# 开发模式（需后端运行）
-npm run dev
-
-# 构建
-npm run build
-
-# 运行测试
-npm test
-```
 
 ## API 文档
 
