@@ -6,32 +6,25 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("review_task")
-public class ReviewTask {
+@TableName("user_api_config")
+public class UserApiConfig {
     @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long userId;
-    private String fileName;
-    private Long fileSize;
 
-    private String previewText;
-    private String fileUrl;
+    private String configName;
 
-    private String contractType;
-    private String userStance;
+    private String apiUrl;
 
-    private String status;
-    private Integer progress;
-    private String errorMsg;
+    private String apiKey;
 
-    private Integer totalChunks;
-    private Integer reviewedChunks;
+    private String model;
+
+    private Integer isActive;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-
-    private LocalDateTime completedAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;

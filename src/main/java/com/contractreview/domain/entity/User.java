@@ -21,15 +21,6 @@ public class User {
 
     private String role;
 
-    @TableField("custom_api_url")
-    private String customApiUrl;
-
-    @TableField("custom_api_key")
-    private String customApiKey;
-
-    @TableField("custom_model")
-    private String customModel;
-
     @Version
     private Integer version;
 
@@ -38,4 +29,7 @@ public class User {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @TableLogic
+    private LocalDateTime deletedAt;
 }

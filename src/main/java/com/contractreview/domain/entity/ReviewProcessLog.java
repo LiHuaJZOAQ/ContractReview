@@ -17,4 +17,7 @@ public class ReviewProcessLog {
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
+
+    @TableLogic
+    private LocalDateTime deletedAt;
 }

@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.contractreview.common.BusinessException;
 import com.contractreview.domain.dto.UserProfileResponse;
 import com.contractreview.domain.entity.User;
+import com.contractreview.domain.entity.UserApiConfig;
+import com.contractreview.mapper.UserApiConfigMapper;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import java.time.format.DateTimeFormatter;
 public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
+    private final UserApiConfigMapper userApiConfigMapper;
 
     private static final int DEFAULT_QUOTA = 10;
 
@@ -28,15 +31,20 @@ public class UserServiceImpl implements UserService {
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
+        UserApiConfig activeConfig = userApiConfigMapper.selectOne(
+                new LambdaQueryWrapper<UserApiConfig>()
+                        .eq(UserApiConfig::getUserId, userId)
+                        .eq(UserApiConfig::getIsActive, 1)
+                        .last("LIMIT 1"));
         return new UserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getReviewQuota(),
                 DEFAULT_QUOTA,
                 user.getRole(),
-                user.getCustomApiUrl(),
-                user.getCustomApiKey() != null && !user.getCustomApiKey().isEmpty(),
-                user.getCustomModel(),
+                activeConfig != null ? activeConfig.getApiUrl() : null,
+                activeConfig != null,
+                activeConfig != null ? activeConfig.getModel() : null,
                 user.getCreatedAt() != null ? user.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null
         );
     }
@@ -77,9 +85,25 @@ public class UserServiceImpl implements UserService {
         if (user == null) {
             throw new BusinessException(404, "用户不存在");
         }
-        if (apiUrl != null) user.setCustomApiUrl(apiUrl);
-        if (apiKey != null) user.setCustomApiKey(apiKey);
-        if (model != null) user.setCustomModel(model);
-        userMapper.updateById(user);
+        UserApiConfig existingConfig = userApiConfigMapper.selectOne(
+                new LambdaQueryWrapper<UserApiConfig>()
+                        .eq(UserApiConfig::getUserId, userId)
+                        .eq(UserApiConfig::getIsActive, 1)
+                        .last("LIMIT 1"));
+        if (existingConfig != null) {
+            if (apiUrl != null) existingConfig.setApiUrl(apiUrl);
+            if (apiKey != null) existingConfig.setApiKey(apiKey);
+            if (model != null) existingConfig.setModel(model);
+            userApiConfigMapper.updateById(existingConfig);
+        } else {
+            UserApiConfig newConfig = new UserApiConfig();
+            newConfig.setUserId(userId);
+            newConfig.setConfigName("默认配置");
+            newConfig.setApiUrl(apiUrl != null ? apiUrl : "");
+            newConfig.setApiKey(apiKey != null ? apiKey : "");
+            newConfig.setModel(model != null ? model : "");
+            newConfig.setIsActive(1);
+            userApiConfigMapper.insert(newConfig);
+        }
     }
 }
