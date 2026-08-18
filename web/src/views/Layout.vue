@@ -111,6 +111,7 @@
                 <el-dropdown-item disabled>
                   <span style="color: var(--color-text-secondary)">{{ auth.username || auth.userId }}</span>
                 </el-dropdown-item>
+                <el-dropdown-item divided @click="$router.push('/profile')">个人中心</el-dropdown-item>
                 <el-dropdown-item divided>
                   <ThemeToggle mode="dropdown" />
                 </el-dropdown-item>
@@ -152,21 +153,41 @@ const auth = useAuthStore()
 const sidebarCollapsed = ref(false)
 const recordsExpanded = ref(true)
 const recentRecords = ref([])
-const quotaTotal = ref(10)
 const quotaRemaining = computed(() => auth.reviewQuota ?? 0)
+const quotaTotal = computed(() => auth.quotaTotal ?? 10)
 
-const navItems = [
-  { 
-    to: '/upload', 
-    label: '合同上传',
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
-  },
-  { 
-    to: '/history', 
-    label: '审查历史',
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+const navItems = computed(() => {
+  const items = [
+    { 
+      to: '/upload', 
+      label: '合同上传',
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    },
+    { 
+      to: '/history', 
+      label: '审查历史',
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+    },
+    {
+      to: '/laws',
+      label: '法规库',
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>'
+    },
+    {
+      to: '/profile',
+      label: '个人中心',
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+    }
+  ]
+  if (auth.role === 'ADMIN') {
+    items.push({
+      to: '/admin',
+      label: '管理后台',
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>'
+    })
   }
-]
+  return items
+})
 
 const userInitial = computed(() => {
   const name = auth.username || String(auth.userId || '')
