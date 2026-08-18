@@ -7,9 +7,15 @@
     <div v-if="progressTaskId" class="progress-panel">
       <div class="progress-panel-header">
         <span class="progress-panel-title">任务 #{{ progressTaskId }} 审查进度</span>
-        <button class="progress-panel-close" @click="progressTaskId = null">
+        <button class="progress-panel-close" @click="progressTaskId = null; previewText = ''">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
+      </div>
+      <div v-if="previewText" class="preview-section">
+        <div class="preview-label">合同预览</div>
+        <div class="preview-block">
+          <pre class="preview-content">{{ previewText }}</pre>
+        </div>
       </div>
       <SseProgress ref="sseRef" :task-id="progressTaskId" @complete="onProgressComplete" @error="onProgressError" />
     </div>
@@ -139,7 +145,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getHistory, retryTask } from '@/api/contract'
+import { getHistory, retryTask, getPreviewText } from '@/api/contract'
 import SseProgress from '@/components/SseProgress.vue'
 
 const tasks = ref([])
@@ -149,6 +155,7 @@ const size = ref(10)
 const loading = ref(false)
 const statusFilter = ref('ALL')
 const progressTaskId = ref(null)
+const previewText = ref('')
 const sseRef = ref(null)
 
 const filters = [
@@ -237,6 +244,7 @@ async function handleRetry(row) {
     await retryTask(row.taskId)
     ElMessage.success('已重新提交审查')
     progressTaskId.value = row.taskId
+    await fetchPreviewText(row.taskId)
     await fetchHistory()
     setTimeout(() => {
       if (sseRef.value) sseRef.value.open()
@@ -246,11 +254,21 @@ async function handleRetry(row) {
   }
 }
 
-function showProgress(taskId) {
+async function showProgress(taskId) {
   progressTaskId.value = taskId
+  await fetchPreviewText(taskId)
   setTimeout(() => {
     if (sseRef.value) sseRef.value.open()
   }, 100)
+}
+
+async function fetchPreviewText(taskId) {
+  try {
+    const res = await getPreviewText(taskId)
+    previewText.value = res || ''
+  } catch {
+    previewText.value = ''
+  }
 }
 
 function onProgressComplete() {
@@ -322,6 +340,34 @@ onMounted(fetchHistory)
 .progress-panel-close svg {
   width: 16px;
   height: 16px;
+}
+
+.preview-section {
+  margin-bottom: var(--space-4);
+}
+.preview-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+.preview-block {
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.preview-content {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
 }
 
 .history-card {
