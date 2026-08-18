@@ -10,14 +10,30 @@ spring:
   ai:
     vectorstore:
       chroma:
-        host: http://localhost:8000
+        host: ${CHROMA_HOST:http://localhost:8000}
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{userId:-}]"
+
 jwt:
-  secret: ContractReviewSecretKeyForJWT2026VeryLongString
+  secret: ${JWT_SECRET:ContractReviewSecretKeyForJWT2026VeryLongString}
   access-token-expiration: 7200000
   refresh-token-expiration: 2592000000
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
 contract:
   rate-limit:
