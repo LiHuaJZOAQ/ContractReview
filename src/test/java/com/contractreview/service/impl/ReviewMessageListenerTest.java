@@ -9,6 +9,8 @@ import com.contractreview.domain.entity.User;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.service.AgentOrchestrator;
+import com.contractreview.service.ReviewMessageListener;
+import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.rabbitmq.client.Channel;
@@ -44,12 +46,12 @@ class ReviewMessageListenerTest {
     @Mock private Channel channel;
     @Mock private org.springframework.data.redis.core.ValueOperations<String, Object> valueOps;
 
-    private ReviewMessageListener listener;
+    private ReviewMessageListenerImpl listener;
 
     @BeforeEach
     void setUp() {
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        listener = new ReviewMessageListener(
+        listener = new ReviewMessageListenerImpl(
                 stateMachine, agentOrchestrator, sseService, taskMapper,
                 userMapper, redisTemplate, rabbitTemplate, reviewResultHandler);
         ReflectionTestUtils.setField(listener, "maxRetryCount", 3);

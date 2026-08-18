@@ -7,6 +7,8 @@ import com.contractreview.domain.enums.TaskStatus;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.service.AgentOrchestrator;
+import com.contractreview.service.ReviewMessageListener;
+import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.contractreview.common.BusinessException;
@@ -14,9 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.connection.ChannelProxy;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ReviewMessageListener {
+public class ReviewMessageListenerImpl implements ReviewMessageListener {
 
     private final ReviewStateMachine stateMachine;
     private final AgentOrchestrator agentOrchestrator;
@@ -38,6 +38,7 @@ public class ReviewMessageListener {
     @Value("${contract.review.max-retry-count:3}")
     private int maxRetryCount;
 
+    @Override
     @RabbitListener(queues = "${contract.review.queue.name:contract.review.queue}",
             ackMode = "MANUAL")
     public void handleReviewMessage(ReviewMessage message, Message amqpMessage,
@@ -91,6 +92,7 @@ public class ReviewMessageListener {
         }
     }
 
+    @Override
     @RabbitListener(queues = "${contract.review.dlx.name:contract.review.dlx}")
     public void handleDlxMessage(ReviewMessage message) {
         Long taskId = message.getTaskId();

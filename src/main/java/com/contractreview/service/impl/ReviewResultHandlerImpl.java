@@ -12,6 +12,7 @@ import com.contractreview.mapper.ReviewReportMapper;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.mapper.RiskItemMapper;
 import com.contractreview.mapper.UserMapper;
+import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +28,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ReviewResultHandler {
+public class ReviewResultHandlerImpl implements ReviewResultHandler {
 
     private final ReviewStateMachine stateMachine;
     private final ReviewTaskMapper taskMapper;
@@ -38,6 +39,7 @@ public class ReviewResultHandler {
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, Object> redisTemplate;
 
+    @Override
     @Transactional
     public void handleSuccess(Long taskId, SummarizeResult result) {
         try {
@@ -63,6 +65,7 @@ public class ReviewResultHandler {
         }
     }
 
+    @Override
     @Transactional
     public void handleFailure(Long taskId, Long userId, ReviewMessage message, Throwable throwable) {
         log.error("Review failed for task {}: {}", taskId, throwable.getMessage());

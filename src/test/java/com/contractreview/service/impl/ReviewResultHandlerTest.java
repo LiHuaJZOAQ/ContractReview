@@ -12,6 +12,7 @@ import com.contractreview.mapper.ReviewReportMapper;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.mapper.RiskItemMapper;
 import com.contractreview.mapper.UserMapper;
+import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,7 +53,7 @@ class ReviewResultHandlerTest {
         objectMapper = new ObjectMapper();
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
 
-        handler = new ReviewResultHandler(
+        handler = new ReviewResultHandlerImpl(
                 stateMachine, taskMapper, reportMapper, riskItemMapper,
                 userMapper, sseService, objectMapper, redisTemplate);
     }
