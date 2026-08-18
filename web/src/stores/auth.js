@@ -8,6 +8,8 @@ export const useAuthStore = defineStore('auth', () => {
   const userId = ref(localStorage.getItem('userId') || '')
   const username = ref(localStorage.getItem('username') || '')
   const reviewQuota = ref(parseInt(localStorage.getItem('reviewQuota'), 10) || 0)
+  const quotaTotal = ref(parseInt(localStorage.getItem('quotaTotal'), 10) || 10)
+  const role = ref(localStorage.getItem('role') || 'USER')
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -29,11 +31,15 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = data.userId
     username.value = data.username || ''
     reviewQuota.value = data.reviewQuota ?? 0
+    quotaTotal.value = data.quotaTotal ?? 10
+    role.value = data.role || 'USER'
     localStorage.setItem('token', data.token)
     localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('userId', data.userId)
     localStorage.setItem('username', data.username || '')
     localStorage.setItem('reviewQuota', String(reviewQuota.value))
+    localStorage.setItem('quotaTotal', String(quotaTotal.value))
+    localStorage.setItem('role', role.value)
   }
 
   function logout() {
@@ -42,11 +48,15 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = ''
     username.value = ''
     reviewQuota.value = 0
+    quotaTotal.value = 10
+    role.value = 'USER'
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userId')
     localStorage.removeItem('username')
     localStorage.removeItem('reviewQuota')
+    localStorage.removeItem('quotaTotal')
+    localStorage.removeItem('role')
   }
 
   async function refresh() {
@@ -55,5 +65,5 @@ export const useAuthStore = defineStore('auth', () => {
     return res
   }
 
-  return { token, refreshTokenValue, userId, username, reviewQuota, isAuthenticated, login, register, logout, refresh }
+  return { token, refreshTokenValue, userId, username, reviewQuota, quotaTotal, role, isAuthenticated, login, register, logout, refresh }
 })

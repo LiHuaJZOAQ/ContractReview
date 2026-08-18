@@ -110,9 +110,11 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { uploadFile, pasteText, submitTask } from '@/api/contract'
+import { useAuthStore } from '@/stores/auth'
 import SseProgress from '@/components/SseProgress.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
 const sseRef = ref(null)
 const desensitize = ref(true)
 const previewText = ref('')
@@ -187,6 +189,10 @@ async function handleSubmit() {
   try {
     await submitTask(currentTaskId.value)
     submitting.value = false
+    if (auth.reviewQuota > 0) {
+      auth.reviewQuota--
+      localStorage.setItem('reviewQuota', String(auth.reviewQuota))
+    }
     sseRef.value.open()
   } catch (e) {
     submitting.value = false

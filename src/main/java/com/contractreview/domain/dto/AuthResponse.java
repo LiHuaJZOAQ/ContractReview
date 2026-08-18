@@ -12,4 +12,5 @@ public class AuthResponse {
     private String refreshToken;
     private long expiresIn;
     private int reviewQuota;
+    private int quotaTotal;
 }
