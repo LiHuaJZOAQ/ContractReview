@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface ContractService {
     UploadResponse upload(MultipartFile file, Long userId, boolean desensitize);
+    UploadResponse pasteText(String text, Long userId, boolean desensitize);
     void submit(Long taskId, Long userId);
     StatusResponse getStatus(Long taskId, Long userId);
     ReportResponse getReport(Long taskId, Long userId);
