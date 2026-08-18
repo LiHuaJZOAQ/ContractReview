@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshTokenValue = ref(localStorage.getItem('refreshToken') || '')
   const userId = ref(localStorage.getItem('userId') || '')
   const username = ref(localStorage.getItem('username') || '')
+  const reviewQuota = ref(parseInt(localStorage.getItem('reviewQuota'), 10) || 0)
 
   const isAuthenticated = computed(() => !!token.value)
 
@@ -27,10 +28,12 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenValue.value = data.refreshToken
     userId.value = data.userId
     username.value = data.username || ''
+    reviewQuota.value = data.reviewQuota ?? 0
     localStorage.setItem('token', data.token)
     localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('userId', data.userId)
     localStorage.setItem('username', data.username || '')
+    localStorage.setItem('reviewQuota', String(reviewQuota.value))
   }
 
   function logout() {
@@ -38,10 +41,12 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenValue.value = ''
     userId.value = ''
     username.value = ''
+    reviewQuota.value = 0
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userId')
     localStorage.removeItem('username')
+    localStorage.removeItem('reviewQuota')
   }
 
   async function refresh() {
@@ -50,5 +55,5 @@ export const useAuthStore = defineStore('auth', () => {
     return res
   }
 
-  return { token, refreshTokenValue, userId, username, isAuthenticated, login, register, logout, refresh }
+  return { token, refreshTokenValue, userId, username, reviewQuota, isAuthenticated, login, register, logout, refresh }
 })

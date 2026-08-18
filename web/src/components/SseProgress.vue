@@ -18,10 +18,10 @@
       >
         <div class="timeline-marker">
           <svg v-if="stage.status === 'done'" class="marker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20,6 9,17 4,12"/>
+            <polyline points="20,6 9,17 4,12" />
           </svg>
           <svg v-else-if="stage.status === 'error'" class="marker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
           <span v-else class="marker-dot" />
         </div>
@@ -38,7 +38,7 @@
         <span class="output-title">中间结果</span>
         <span class="output-count">{{ outputs.length }} 条</span>
       </div>
-      <div class="output-body" ref="outputRef">
+      <div ref="outputRef" class="output-body">
         <div v-for="(item, i) in outputs" :key="i" class="output-item">
           <span class="output-agent">{{ item.agent }}</span>
           <pre class="output-text">{{ item.content }}</pre>

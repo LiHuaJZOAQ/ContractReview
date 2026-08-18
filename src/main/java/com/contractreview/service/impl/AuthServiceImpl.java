@@ -101,6 +101,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
-        return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken, jwtUtils.getAccessTokenExpiration() / 1000);
+        return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken,
+                jwtUtils.getAccessTokenExpiration() / 1000, user.getReviewQuota());
     }
 }
