@@ -1,5 +1,7 @@
 package com.contractreview.security;
 
+import com.contractreview.domain.entity.User;
+import com.contractreview.mapper.UserMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,19 +18,21 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
     @Mock private JwtUtils jwtUtils;
+    @Mock private UserMapper userMapper;
     @Mock private FilterChain filterChain;
 
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtUtils);
+        filter = new JwtAuthenticationFilter(jwtUtils, userMapper);
         SecurityContextHolder.clearContext();
     }
 
@@ -37,6 +41,9 @@ class JwtAuthenticationFilterTest {
     void testValidBearerToken() throws ServletException, IOException {
         when(jwtUtils.validateToken("valid-token")).thenReturn(true);
         when(jwtUtils.getUserIdFromToken("valid-token")).thenReturn(42L);
+        User mockUser = new User();
+        mockUser.setRole("USER");
+        when(userMapper.selectById(42L)).thenReturn(mockUser);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer valid-token");
@@ -100,6 +107,9 @@ class JwtAuthenticationFilterTest {
     void testUserContextClearedAfterFilter() throws ServletException, IOException {
         when(jwtUtils.validateToken("valid-token")).thenReturn(true);
         when(jwtUtils.getUserIdFromToken("valid-token")).thenReturn(1L);
+        User mockUser = new User();
+        mockUser.setRole("ADMIN");
+        when(userMapper.selectById(1L)).thenReturn(mockUser);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer valid-token");

@@ -19,6 +19,17 @@ public class User {
     @TableField("review_quota")
     private Integer reviewQuota;
 
+    private String role;
+
+    @TableField("custom_api_url")
+    private String customApiUrl;
+
+    @TableField("custom_api_key")
+    private String customApiKey;
+
+    @TableField("custom_model")
+    private String customModel;
+
     @Version
     private Integer version;
 
