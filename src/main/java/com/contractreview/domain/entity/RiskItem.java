@@ -25,5 +25,5 @@ public class RiskItem {
     private LocalDateTime createdAt;
 
     @TableLogic
-    private LocalDateTime deletedAt;
+    private Integer deleted;
 }

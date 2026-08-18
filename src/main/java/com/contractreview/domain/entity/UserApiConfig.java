@@ -30,5 +30,5 @@ public class UserApiConfig {
     private LocalDateTime updatedAt;
 
     @TableLogic
-    private LocalDateTime deletedAt;
+    private Integer deleted;
 }

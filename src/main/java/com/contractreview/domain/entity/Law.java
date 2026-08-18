@@ -29,5 +29,5 @@ public class Law {
     private LocalDateTime updatedAt;
 
     @TableLogic
-    private LocalDateTime deletedAt;
+    private Integer deleted;
 }

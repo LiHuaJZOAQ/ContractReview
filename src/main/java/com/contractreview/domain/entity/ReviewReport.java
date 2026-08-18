@@ -23,5 +23,5 @@ public class ReviewReport {
     private LocalDateTime createdAt;
 
     @TableLogic
-    private LocalDateTime deletedAt;
+    private Integer deleted;
 }

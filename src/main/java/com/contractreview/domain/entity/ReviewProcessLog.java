@@ -19,5 +19,5 @@ public class ReviewProcessLog {
     private LocalDateTime createdAt;
 
     @TableLogic
-    private LocalDateTime deletedAt;
+    private Integer deleted;
 }

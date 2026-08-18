@@ -1,5 +1,7 @@
 package com.contractreview.aop;
 
+import com.contractreview.common.R;
+import com.contractreview.domain.dto.AuthResponse;
 import com.contractreview.domain.entity.OperationLog;
 import com.contractreview.mapper.OperationLogMapper;
 import com.contractreview.security.UserContext;
@@ -32,8 +34,15 @@ public class OperationLogAspect {
         long duration = System.currentTimeMillis() - start;
 
         try {
+            Long userId = UserContext.getUserId();
+            if (userId == null && result instanceof R<?> r && r.getData() instanceof AuthResponse authResp) {
+                userId = authResp.getUserId();
+            }
+            if (userId == null) {
+                return result;
+            }
             OperationLog opLog = new OperationLog();
-            opLog.setUserId(UserContext.getUserId());
+            opLog.setUserId(userId);
             opLog.setAction(auditLog.action());
 
             Object[] args = joinPoint.getArgs();
