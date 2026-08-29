@@ -4,6 +4,22 @@
       <h2 class="page-title">审查历史</h2>
     </div>
 
+    <div v-if="progressTaskId" class="progress-panel">
+      <div class="progress-panel-header">
+        <span class="progress-panel-title">任务 #{{ progressTaskId }} 审查进度</span>
+        <button class="progress-panel-close" @click="progressTaskId = null; previewText = ''">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div v-if="previewText" class="preview-section">
+        <div class="preview-label">合同预览</div>
+        <div class="preview-block">
+          <pre class="preview-content">{{ previewText }}</pre>
+        </div>
+      </div>
+      <SseProgress ref="sseRef" :task-id="progressTaskId" @complete="onProgressComplete" @error="onProgressError" />
+    </div>
+
     <div class="history-card">
       <div class="filter-bar">
         <div class="segment-control">
@@ -66,7 +82,7 @@
                   <button
                     v-else-if="isProcessing(row.status)"
                     class="action-link"
-                    @click="$router.push(`/report/${row.taskId}`)"
+                    @click="showProgress(row.taskId)"
                   >
                     查看进度
                   </button>
@@ -78,10 +94,10 @@
 
         <div v-else key="empty" class="empty-state">
           <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="8" y="6" width="32" height="36" rx="3"/>
-            <line x1="16" y1="16" x2="32" y2="16"/>
-            <line x1="16" y1="24" x2="28" y2="24"/>
-            <line x1="16" y1="32" x2="24" y2="32"/>
+            <rect x="8" y="6" width="32" height="36" rx="3" />
+            <line x1="16" y1="16" x2="32" y2="16" />
+            <line x1="16" y1="24" x2="28" y2="24" />
+            <line x1="16" y1="32" x2="24" y2="32" />
           </svg>
           <p>暂无审查记录</p>
         </div>
@@ -103,7 +119,7 @@
         </div>
         <div class="page-btns">
           <button class="page-btn" :disabled="page <= 1" @click="goPage(page - 1)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6" /></svg>
           </button>
           <template v-for="p in pageNumbers" :key="p">
             <span v-if="p === '...'" class="page-ellipsis">...</span>
@@ -117,7 +133,7 @@
             </button>
           </template>
           <button class="page-btn" :disabled="page >= totalPages" @click="goPage(page + 1)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9,6 15,12 9,18"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9,6 15,12 9,18" /></svg>
           </button>
           <span class="page-total">共 {{ total }} 条</span>
         </div>
@@ -129,7 +145,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getHistory, retryTask } from '@/api/contract'
+import { getHistory, retryTask, getPreviewText } from '@/api/contract'
+import SseProgress from '@/components/SseProgress.vue'
 
 const tasks = ref([])
 const total = ref(0)
@@ -137,6 +154,9 @@ const page = ref(1)
 const size = ref(10)
 const loading = ref(false)
 const statusFilter = ref('ALL')
+const progressTaskId = ref(null)
+const previewText = ref('')
+const sseRef = ref(null)
 
 const filters = [
   { label: '全部', value: 'ALL' },
@@ -223,10 +243,44 @@ async function handleRetry(row) {
   try {
     await retryTask(row.taskId)
     ElMessage.success('已重新提交审查')
+    progressTaskId.value = row.taskId
+    await fetchPreviewText(row.taskId)
     await fetchHistory()
+    setTimeout(() => {
+      if (sseRef.value) sseRef.value.open()
+    }, 100)
   } catch (e) {
     ElMessage.error(e?.message || '重试失败')
   }
+}
+
+async function showProgress(taskId) {
+  progressTaskId.value = taskId
+  await fetchPreviewText(taskId)
+  setTimeout(() => {
+    if (sseRef.value) sseRef.value.open()
+  }, 100)
+}
+
+async function fetchPreviewText(taskId) {
+  try {
+    const res = await getPreviewText(taskId)
+    previewText.value = res || ''
+  } catch {
+    previewText.value = ''
+  }
+}
+
+function onProgressComplete() {
+  ElMessage.success('审查完成')
+  progressTaskId.value = null
+  fetchHistory()
+}
+
+function onProgressError(msg) {
+  ElMessage.error(msg)
+  progressTaskId.value = null
+  fetchHistory()
 }
 
 onMounted(fetchHistory)
@@ -245,6 +299,74 @@ onMounted(fetchHistory)
   font-size: var(--text-2xl);
   font-weight: 600;
   color: var(--color-text-primary);
+  margin: 0;
+}
+
+.progress-panel {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+.progress-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.progress-panel-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.progress-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.progress-panel-close:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+.progress-panel-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.preview-section {
+  margin-bottom: var(--space-4);
+}
+.preview-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+.preview-block {
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.preview-content {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
   margin: 0;
 }
 

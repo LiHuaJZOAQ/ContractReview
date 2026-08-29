@@ -3,43 +3,79 @@
     <div class="upload-card">
       <h2 class="card-title">上传合同文件</h2>
 
-      <div
-        class="upload-area"
-        :class="{ 'has-file': selectedFile, dragover }"
-        @dragover.prevent="dragover = true"
-        @dragleave="dragover = false"
-        @drop.prevent="handleDrop"
-        @click="$refs.fileInput.click()"
-      >
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".pdf,.doc,.docx"
-          class="file-input"
-          @change="handleFileInput"
-        />
-        <div v-if="!selectedFile" class="upload-placeholder">
-          <svg class="upload-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M24 32V16M16 22l8-8 8 8"/>
-            <path d="M40 32v4a4 4 0 01-4 4H12a4 4 0 01-4-4v-4"/>
-          </svg>
-          <p class="upload-text">拖拽文件到此处，或 <span class="upload-link">点击选择</span></p>
-          <p class="upload-hint">支持 PDF、Word 格式，文件不超过 20MB</p>
-        </div>
-        <div v-else class="file-info">
-          <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-          </svg>
-          <div class="file-meta">
-            <span class="file-name">{{ selectedFile.name }}</span>
-            <span class="file-size">{{ formatSize(selectedFile.size) }}</span>
-          </div>
-          <button class="file-remove" @click.stop="clearFile">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
+      <div class="tab-bar">
+        <button :class="['tab-btn', { active: mode === 'file' }]" @click="mode = 'file'">文件上传</button>
+        <button :class="['tab-btn', { active: mode === 'paste' }]" @click="mode = 'paste'">粘贴文本</button>
       </div>
+
+      <template v-if="mode === 'file'">
+        <div
+          class="upload-area"
+          :class="{ 'has-file': selectedFile, dragover }"
+          @dragover.prevent="dragover = true"
+          @dragleave="dragover = false"
+          @drop.prevent="handleDrop"
+          @click="$refs.fileInput.click()"
+        >
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".pdf,.docx,.txt"
+            class="file-input"
+            @change="handleFileInput"
+          />
+          <div v-if="!selectedFile" class="upload-placeholder">
+            <svg class="upload-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M24 32V16M16 22l8-8 8 8" />
+              <path d="M40 32v4a4 4 0 01-4 4H12a4 4 0 01-4-4v-4" />
+            </svg>
+            <p class="upload-text">拖拽文件到此处，或 <span class="upload-link">点击选择</span></p>
+            <p class="upload-hint">支持 PDF、Word、TXT 格式，文件不超过 20MB</p>
+          </div>
+          <div v-else class="file-info">
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14,2 14,8 20,8" />
+            </svg>
+            <div class="file-meta">
+              <span class="file-name">{{ selectedFile.name }}</span>
+              <span class="file-size">{{ formatSize(selectedFile.size) }}</span>
+            </div>
+            <button class="file-remove" @click.stop="clearFile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <button
+          v-if="selectedFile && !previewText"
+          class="btn btn-primary btn-full"
+          :disabled="uploading"
+          @click="handleUpload"
+        >
+          <span v-if="uploading" class="spinner" />
+          {{ uploading ? '上传中...' : '上传预览' }}
+        </button>
+      </template>
+
+      <template v-else>
+        <textarea
+          v-model="pastedText"
+          class="paste-textarea"
+          placeholder="在此粘贴合同文本内容..."
+          rows="12"
+        />
+        <div v-if="pastedText" class="paste-hint">{{ pastedText.length }} 字</div>
+        <button
+          v-if="pastedText && !previewText"
+          class="btn btn-primary btn-full"
+          :disabled="uploading"
+          @click="handlePaste"
+        >
+          <span v-if="uploading" class="spinner" />
+          {{ uploading ? '处理中...' : '预览文本' }}
+        </button>
+      </template>
 
       <div class="option-row">
         <label class="toggle-label">
@@ -49,16 +85,6 @@
           <span class="toggle-text">启用脱敏</span>
         </label>
       </div>
-
-      <button
-        v-if="selectedFile && !previewText"
-        class="btn btn-primary btn-full"
-        :disabled="uploading"
-        @click="handleUpload"
-      >
-        <span v-if="uploading" class="spinner" />
-        {{ uploading ? '上传中...' : '上传预览' }}
-      </button>
 
       <div v-if="previewText" class="preview-section">
         <div class="section-label">文本预览</div>
@@ -83,10 +109,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { uploadFile, submitTask } from '@/api/contract'
+import { uploadFile, pasteText, submitTask } from '@/api/contract'
+import { useAuthStore } from '@/stores/auth'
 import SseProgress from '@/components/SseProgress.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
 const sseRef = ref(null)
 const desensitize = ref(true)
 const previewText = ref('')
@@ -95,6 +123,8 @@ const selectedFile = ref(null)
 const uploading = ref(false)
 const submitting = ref(false)
 const dragover = ref(false)
+const mode = ref('file')
+const pastedText = ref('')
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -139,12 +169,30 @@ async function handleUpload() {
   }
 }
 
+async function handlePaste() {
+  if (!pastedText.value.trim()) return
+  uploading.value = true
+  try {
+    const res = await pasteText(pastedText.value, desensitize.value)
+    previewText.value = res.previewText
+    currentTaskId.value = res.taskId
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '处理失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
 async function handleSubmit() {
   if (!currentTaskId.value) return
   submitting.value = true
   try {
     await submitTask(currentTaskId.value)
     submitting.value = false
+    if (auth.reviewQuota > 0) {
+      auth.reviewQuota--
+      localStorage.setItem('reviewQuota', String(auth.reviewQuota))
+    }
     sseRef.value.open()
   } catch (e) {
     submitting.value = false
@@ -155,6 +203,7 @@ async function handleSubmit() {
 function handleBack() {
   previewText.value = ''
   currentTaskId.value = null
+  pastedText.value = ''
 }
 
 function onComplete() {
@@ -184,7 +233,66 @@ function onError(msg) {
   font-size: var(--text-xl);
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0 0 var(--space-6);
+  margin: 0 0 var(--space-5);
+}
+
+.tab-bar {
+  display: flex;
+  gap: var(--space-1);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: var(--space-5);
+}
+.tab-btn {
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-ui);
+}
+.tab-btn.active {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-xs);
+}
+.tab-btn:hover:not(.active) {
+  color: var(--color-text-primary);
+}
+
+.paste-textarea {
+  width: 100%;
+  min-height: 240px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+}
+.paste-textarea:focus {
+  border-color: var(--color-accent);
+}
+.paste-textarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+.paste-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: right;
+  margin-top: var(--space-1);
 }
 
 .upload-area {

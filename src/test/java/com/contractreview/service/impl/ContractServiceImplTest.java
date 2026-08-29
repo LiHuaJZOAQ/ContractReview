@@ -160,12 +160,17 @@ class ContractServiceImplTest {
     void testSubmitSuccess() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+        User user = new User();
+        user.setId(userId);
+        user.setReviewQuota(5);
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(5)))
                 .thenReturn(4L);
 
         contractService.submit(taskId, userId);
 
-        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1));
+        verify(userMapper).selectById(userId);
+        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(5));
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessage.class));
     }
 
@@ -204,13 +209,10 @@ class ContractServiceImplTest {
     }
 
     @Test
-    @DisplayName("提交时 Redis 无配额缓存且用户也不存在")
-    void testSubmitNoQuotaInRedisAndUserNotFound() {
+    @DisplayName("提交时用户不存在")
+    void testSubmitUserNotFound() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
-                .thenReturn(-1L);
-        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(false);
         when(userMapper.selectById(userId)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -223,13 +225,12 @@ class ContractServiceImplTest {
     void testSubmitQuotaInsufficient() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
-                .thenReturn(-1L);
         User user = new User();
         user.setId(userId);
         user.setReviewQuota(0);
         when(userMapper.selectById(userId)).thenReturn(user);
-        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(true);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(0)))
+                .thenReturn(-1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.submit(taskId, userId));

@@ -1,8 +1,11 @@
 package com.contractreview.aop;
 
+import com.contractreview.common.R;
+import com.contractreview.domain.dto.AuthResponse;
 import com.contractreview.domain.entity.OperationLog;
 import com.contractreview.mapper.OperationLogMapper;
 import com.contractreview.security.UserContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Map;
+
 @Slf4j
 @Aspect
 @Component
@@ -20,6 +25,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class OperationLogAspect {
 
     private final OperationLogMapper operationLogMapper;
+    private final ObjectMapper objectMapper;
 
     @Around("@annotation(auditLog)")
     public Object logOperation(ProceedingJoinPoint joinPoint, AuditLog auditLog) throws Throwable {
@@ -28,8 +34,15 @@ public class OperationLogAspect {
         long duration = System.currentTimeMillis() - start;
 
         try {
+            Long userId = UserContext.getUserId();
+            if (userId == null && result instanceof R<?> r && r.getData() instanceof AuthResponse authResp) {
+                userId = authResp.getUserId();
+            }
+            if (userId == null) {
+                return result;
+            }
             OperationLog opLog = new OperationLog();
-            opLog.setUserId(UserContext.getUserId());
+            opLog.setUserId(userId);
             opLog.setAction(auditLog.action());
 
             Object[] args = joinPoint.getArgs();
@@ -40,7 +53,10 @@ public class OperationLogAspect {
                 }
             }
 
-            String detail = String.format("{\"method\":\"%s\",\"duration\":%d}", joinPoint.getSignature().getName(), duration);
+            String detail = objectMapper.writeValueAsString(Map.of(
+                    "method", joinPoint.getSignature().getName(),
+                    "duration", duration
+            ));
             opLog.setDetail(detail);
 
             ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();

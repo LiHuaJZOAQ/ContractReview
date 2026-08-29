@@ -1,6 +1,10 @@
 package com.contractreview.service.impl;
 
+import com.contractreview.domain.dto.ClassifyResult;
+import com.contractreview.domain.dto.ScanRiskItem;
+import com.contractreview.domain.dto.SummarizeResult;
 import com.contractreview.domain.entity.ReviewProcessLog;
+import com.contractreview.domain.enums.TaskStatus;
 import com.contractreview.mapper.ReviewProcessLogMapper;
 import com.contractreview.service.AgentOrchestrator;
 import com.contractreview.service.AgentService;
@@ -16,9 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
@@ -40,35 +42,35 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
 
     @Override
     @Async("taskExecutor")
-    public CompletableFuture<Map<String, Object>> executeReview(Long taskId, String fullText, SseService sseService) {
+    public CompletableFuture<SummarizeResult> executeReview(Long taskId, String fullText, SseService sseService) {
         try {
             sseService.sendProgress(taskId, "parsing", 10, "正在解析文档...");
             Thread.sleep(500);
 
             sseService.sendProgress(taskId, "classifying", 20, "正在进行合同分类...");
-            Map<String, String> classification = agentService.classifyContract(fullText);
-            String contractType = classification.getOrDefault("contractType", "其他");
-            String userStance = classification.getOrDefault("userStance", "其他");
-            String strategy = classification.getOrDefault("reviewStrategy", "标准审查");
+            ClassifyResult classification = agentService.classifyContract(fullText);
+            String contractType = classification.getContractType() != null ? classification.getContractType() : "其他";
+            String userStance = classification.getUserStance() != null ? classification.getUserStance() : "其他";
+            String strategy = classification.getReviewStrategy() != null ? classification.getReviewStrategy() : "标准审查";
             log.info("Agent A classified: type={}, stance={}", contractType, userStance);
             String agentAResult = "合同类型: " + contractType + "\n立场: " + userStance + "\n策略: " + strategy;
             sseService.sendLlmOutput(taskId, "Agent-A 合同分类", agentAResult);
             saveProcessLog(taskId, "Agent-A 合同分类", agentAResult);
-            stateMachine.transition(taskId, "PARSING", "RETRIEVING");
+            stateMachine.transition(taskId, TaskStatus.PARSING, TaskStatus.RETRIEVING);
 
             sseService.sendProgress(taskId, "retrieving", 30, "正在检索相关法条...");
             List<String> chunks = ChunkingUtil.chunkByClause(fullText);
             final List<String> finalChunks = chunks.isEmpty() ? ChunkingUtil.chunkByLength(fullText) : chunks;
             log.info("Chunked into {} parts", finalChunks.size());
 
-            stateMachine.transition(taskId, "RETRIEVING", "REVIEWING");
+            stateMachine.transition(taskId, TaskStatus.RETRIEVING, TaskStatus.REVIEWING);
 
             final int totalChunks = finalChunks.size();
-            List<CompletableFuture<List<Map<String, Object>>>> futures = new ArrayList<>();
+            List<CompletableFuture<List<ScanRiskItem>>> futures = new ArrayList<>();
             for (int i = 0; i < totalChunks; i++) {
                 String chunk = finalChunks.get(i);
                 final int index = i;
-                CompletableFuture<List<Map<String, Object>>> future = CompletableFuture.supplyAsync(() -> {
+                CompletableFuture<List<ScanRiskItem>> future = CompletableFuture.supplyAsync(() -> {
                     try {
                         semaphore.acquire();
                         try {
@@ -77,14 +79,15 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                                     "正在审查第 " + (index + 1) + "/" + totalChunks + " 条...");
                             log.info("Agent B scanning chunk {}/{}", index + 1, totalChunks);
                             List<String> laws = ragService.retrieveRelevantLaws(chunk);
-                            List<Map<String, Object>> risks = agentService.scanRisks(chunk, laws, strategy);
+                            List<ScanRiskItem> risks = agentService.scanRisks(chunk, laws, strategy);
                             enrichRiskLaws(risks, laws);
                             if (!risks.isEmpty()) {
                                 String output = "第" + (index + 1) + "条发现 " + risks.size() + " 个风险:\n";
-                                for (Map<String, Object> r : risks) {
-                                    output += "  [" + r.getOrDefault("riskLevel", "LOW") + "] "
-                                            + r.getOrDefault("description", "").toString().substring(0, Math.min(80,
-                                                    r.getOrDefault("description", "").toString().length())) + "\n";
+                                for (ScanRiskItem r : risks) {
+                                    String level = r.getRiskLevel() != null ? r.getRiskLevel() : "LOW";
+                                    String desc = r.getDescription() != null ? r.getDescription() : "";
+                                    output += "  [" + level + "] "
+                                            + desc.substring(0, Math.min(80, desc.length())) + "\n";
                                 }
                                 sseService.sendLlmOutput(taskId, "Agent-B 条款审查", output);
                                 saveProcessLog(taskId, "Agent-B 条款审查", output);
@@ -95,17 +98,19 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                         }
                     } catch (Exception e) {
                         log.warn("Agent B failed for chunk {}: {}", index, e.getMessage());
-                        return List.of();
+                        return List.<ScanRiskItem>of();
                     }
                 });
                 futures.add(future);
             }
 
-            List<Map<String, Object>> allRisks = futures.stream()
+            List<ScanRiskItem> allRisks = futures.stream()
                     .flatMap(f -> {
                         try {
-                            List<Map<String, Object>> risks = f.get();
-                            risks.forEach(r -> r.putIfAbsent("clauseIndex", 0));
+                            List<ScanRiskItem> risks = f.get();
+                            risks.forEach(r -> {
+                                if (r.getClauseIndex() == null) r.setClauseIndex(0);
+                            });
                             return risks.stream();
                         } catch (Exception e) {
                             log.warn("Failed to get Agent B result", e);
@@ -115,12 +120,12 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                     .collect(Collectors.toList());
 
             log.info("Agent B completed, total risks: {}", allRisks.size());
-            stateMachine.transition(taskId, "REVIEWING", "SUMMARIZING");
+            stateMachine.transition(taskId, TaskStatus.REVIEWING, TaskStatus.SUMMARIZING);
 
             sseService.sendProgress(taskId, "summarizing", 90, "正在生成审查报告...");
-            Map<String, Object> report = agentService.summarizeReport(allRisks, contractType);
-            report.put("userStance", userStance);
-            String summary = (String) report.getOrDefault("summary", "");
+            SummarizeResult report = agentService.summarizeReport(allRisks, contractType);
+            report.getRiskCount().put("high", report.getRiskCount().getOrDefault("high", 0));
+            String summary = report.getSummary() != null ? report.getSummary() : "";
             String agentCSummary = summary.length() > 500 ? summary.substring(0, 500) + "..." : summary;
             sseService.sendLlmOutput(taskId, "Agent-C 汇总报告", agentCSummary);
             saveProcessLog(taskId, "Agent-C 汇总报告", agentCSummary);
@@ -137,24 +142,21 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
 
     private void saveProcessLog(Long taskId, String agent, String content) {
         try {
-            ReviewProcessLog log = new ReviewProcessLog();
-            log.setTaskId(taskId);
-            log.setAgent(agent);
-            log.setContent(content);
-            log.setCreatedAt(LocalDateTime.now());
-            processLogMapper.insert(log);
+            ReviewProcessLog logEntry = new ReviewProcessLog();
+            logEntry.setTaskId(taskId);
+            logEntry.setAgent(agent);
+            logEntry.setContent(content);
+            logEntry.setCreatedAt(LocalDateTime.now());
+            processLogMapper.insert(logEntry);
         } catch (Exception e) {
             log.warn("Failed to save process log for task {}: {}", taskId, e.getMessage());
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void enrichRiskLaws(List<Map<String, Object>> risks, List<String> ragLaws) {
-        for (Map<String, Object> risk : risks) {
-            Object raw = risk.get("relatedLaws");
-            if (!(raw instanceof List)) continue;
-            List<String> riskLaws = (List<String>) raw;
-            if (riskLaws.isEmpty()) continue;
+    private void enrichRiskLaws(List<ScanRiskItem> risks, List<String> ragLaws) {
+        for (ScanRiskItem risk : risks) {
+            List<String> riskLaws = risk.getRelatedLaws();
+            if (riskLaws == null || riskLaws.isEmpty()) continue;
             List<String> enriched = new ArrayList<>();
             for (String law : riskLaws) {
                 if (law.contains("：") || law.contains(":")) {
@@ -167,7 +169,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                     enriched.add(full);
                 }
             }
-            risk.put("relatedLaws", enriched);
+            risk.setRelatedLaws(enriched);
         }
     }
 }

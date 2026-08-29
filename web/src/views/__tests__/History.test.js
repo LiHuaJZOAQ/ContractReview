@@ -10,9 +10,11 @@ vi.mock('vue-router', () => ({
 
 const mockGetHistory = vi.fn()
 const mockRetryTask = vi.fn()
+const mockGetPreviewText = vi.fn()
 vi.mock('@/api/contract', () => ({
   getHistory: (...args) => mockGetHistory(...args),
   retryTask: (...args) => mockRetryTask(...args),
+  getPreviewText: (...args) => mockGetPreviewText(...args),
 }))
 
 const History = (await import('@/views/History.vue')).default
@@ -23,7 +25,9 @@ describe('History view', () => {
     mockPush.mockReset()
     mockGetHistory.mockReset()
     mockRetryTask.mockReset()
+    mockGetPreviewText.mockReset()
     mockGetHistory.mockResolvedValue({ tasks: [], total: 0 })
+    mockGetPreviewText.mockResolvedValue('')
   })
 
   it('renders history page', () => {

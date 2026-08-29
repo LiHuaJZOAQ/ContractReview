@@ -15,13 +15,24 @@ public class SseServiceImpl implements SseService {
 
     private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
 
+    private static final long SSE_TIMEOUT_MS = 300_000L;
+
     @Override
     public SseEmitter createEmitter(Long taskId) {
-        SseEmitter emitter = new SseEmitter(0L);
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         emitters.put(taskId, emitter);
-        emitter.onCompletion(() -> emitters.remove(taskId));
-        emitter.onTimeout(() -> emitters.remove(taskId));
-        emitter.onError(e -> emitters.remove(taskId));
+        emitter.onCompletion(() -> {
+            emitters.remove(taskId);
+            log.debug("SSE emitter completed for task {}", taskId);
+        });
+        emitter.onTimeout(() -> {
+            emitters.remove(taskId);
+            log.debug("SSE emitter timed out for task {}", taskId);
+        });
+        emitter.onError(e -> {
+            emitters.remove(taskId);
+            log.debug("SSE emitter error for task {}: {}", taskId, e.getMessage());
+        });
         return emitter;
     }
 
@@ -49,9 +60,11 @@ public class SseServiceImpl implements SseService {
     public void removeEmitter(Long taskId) {
         SseEmitter emitter = emitters.remove(taskId);
         if (emitter != null) {
-            try {
-                emitter.complete();
-            } catch (Exception ignored) {}
+        try {
+            emitter.complete();
+        } catch (Exception e) {
+            log.warn("Failed to complete SSE emitter for task {}: {}", taskId, e.getMessage());
+        }
         }
     }
 

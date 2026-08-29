@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/contract_review?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: root123
+    username: ${MYSQL_ROOT_USERNAME:root}
+    password: ${MYSQL_ROOT_PASSWORD:root123}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   data:
@@ -15,8 +15,8 @@ spring:
   rabbitmq:
     host: localhost
     port: 5672
-    username: guest
-    password: guest
+    username: ${RABBITMQ_DEFAULT_USER:guest}
+    password: ${RABBITMQ_DEFAULT_PASS:guest}
     listener:
       simple:
         prefetch: 10
@@ -29,17 +29,20 @@ spring:
 
   ai:
     openai:
-      base-url: https://你的接口地址/v1
-      api-key: sk-你的key
+      base-url: ${LLM_API_BASE_URL:https://your-api-address/v1}
+      api-key: ${LLM_API_KEY:sk-your-api-key-here}
       chat:
         options:
           model: gpt-4o-mini
           temperature: 0.1
+    vectorstore:
+      chroma:
+        host: ${CHROMA_HOST:http://localhost:8000}
 
 minio:
   endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
+  access-key: ${MINIO_ROOT_USER:minioadmin}
+  secret-key: ${MINIO_ROOT_PASSWORD:minioadmin}
   bucket: contract-files
 
 logging:

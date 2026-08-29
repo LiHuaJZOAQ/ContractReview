@@ -1,7 +1,7 @@
 package com.contractreview.security;
 
 public class UserContext {
-    private static final ThreadLocal<Long> currentUserId = new ThreadLocal<>();
+    private static final InheritableThreadLocal<Long> currentUserId = new InheritableThreadLocal<>();
 
     public static void setUserId(Long userId) {
         currentUserId.set(userId);

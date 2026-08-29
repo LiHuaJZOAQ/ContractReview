@@ -40,7 +40,8 @@ public class AuthServiceImpl implements AuthService {
         user.setUsername(username);
         user.setPasswordHash(org.springframework.security.crypto.bcrypt.BCrypt.hashpw(password,
                 org.springframework.security.crypto.bcrypt.BCrypt.gensalt()));
-        user.setReviewQuota(10);
+        user.setReviewQuota(DEFAULT_QUOTA);
+        user.setRole("USER");
         user.setVersion(0);
         userMapper.insert(user);
 
@@ -100,7 +101,10 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, newToken, newRefreshToken);
     }
 
+    private static final int DEFAULT_QUOTA = 10;
+
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
-        return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken, jwtUtils.getAccessTokenExpiration() / 1000);
+        return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken,
+                jwtUtils.getAccessTokenExpiration() / 1000, user.getReviewQuota(), DEFAULT_QUOTA);
     }
 }

@@ -83,6 +83,7 @@ class AuthServiceImplTest {
         user.setId(1L);
         user.setUsername("testuser");
         user.setPasswordHash(BCrypt.hashpw("password123", BCrypt.gensalt()));
+        user.setReviewQuota(10);
 
         when(userMapper.selectOne(any())).thenReturn(user);
         when(jwtUtils.generateAccessToken(1L)).thenReturn("access-token");
@@ -92,6 +93,7 @@ class AuthServiceImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.getUserId());
+        assertEquals(10, response.getReviewQuota());
     }
 
     @Test
@@ -118,6 +120,7 @@ class AuthServiceImplTest {
         User user = new User();
         user.setId(1L);
         user.setUsername("testuser");
+        user.setReviewQuota(5);
 
         when(valueOps.get("refresh:token:old-refresh")).thenReturn("1");
         when(userMapper.selectById(1L)).thenReturn(user);

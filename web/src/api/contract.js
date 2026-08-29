@@ -9,6 +9,10 @@ export function uploadFile(file, desensitize = true) {
   })
 }
 
+export function pasteText(text, desensitize = true) {
+  return axios.post('/contract/paste', { text }, { params: { desensitize } })
+}
+
 export function submitTask(taskId) {
   return axios.post(`/contract/${taskId}/submit`)
 }
