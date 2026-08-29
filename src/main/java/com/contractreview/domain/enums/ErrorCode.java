@@ -7,6 +7,7 @@ public enum ErrorCode {
     TASK_NOT_FOUND(1004, "任务不存在"),
     INVALID_STATE(1005, "当前任务状态不允许此操作"),
     LLM_API_FAILED(1006, "LLM API 调用失败"),
+    INTERNAL_ERROR(1007, "服务器内部错误"),
     RATE_LIMITED(1008, "请求频率超限"),
     TASK_TIMEOUT(1009, "任务执行超时");
 
@@ -20,4 +21,14 @@ public enum ErrorCode {
 
     public int getCode() { return code; }
     public String getMessage() { return message; }
+
+    public int getHttpStatus() {
+        return switch (this) {
+            case TASK_NOT_FOUND -> 404;
+            case QUOTA_INSUFFICIENT, RATE_LIMITED -> 429;
+            case LLM_API_FAILED, TASK_TIMEOUT -> 502;
+            case FORMAT_NOT_SUPPORTED, FILE_SIZE_EXCEEDED, INVALID_STATE -> 400;
+            default -> 500;
+        };
+    }
 }

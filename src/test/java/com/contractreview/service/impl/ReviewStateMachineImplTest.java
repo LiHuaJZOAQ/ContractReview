@@ -3,6 +3,7 @@ package com.contractreview.service.impl;
 import com.contractreview.common.BusinessException;
 import com.contractreview.domain.entity.ReviewTask;
 import com.contractreview.domain.enums.ErrorCode;
+import com.contractreview.domain.enums.TaskStatus;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.service.ReviewStateMachine;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +33,7 @@ class ReviewStateMachineImplTest {
         stateMachine = new ReviewStateMachineImpl(taskMapper);
         task = new ReviewTask();
         task.setId(1L);
-        task.setStatus("PENDING");
+        task.setStatus(TaskStatus.PENDING.name());
         task.setProgress(0);
     }
 
@@ -52,11 +52,13 @@ class ReviewStateMachineImplTest {
     })
     @DisplayName("所有合法状态转换")
     void testValidTransitions(String from, String to, int expectedProgress) {
+        TaskStatus fromStatus = TaskStatus.valueOf(from);
+        TaskStatus toStatus = TaskStatus.valueOf(to);
         task.setStatus(from);
         task.setProgress(from.equals("FAILED") ? -1 : 50);
         when(taskMapper.selectById(1L)).thenReturn(task);
 
-        stateMachine.transition(1L, from, to);
+        stateMachine.transition(1L, fromStatus, toStatus);
 
         assertEquals(to, task.getStatus());
         assertEquals(expectedProgress, task.getProgress());
@@ -66,10 +68,10 @@ class ReviewStateMachineImplTest {
     @Test
     @DisplayName("转换到终端状态时设置 completedAt")
     void testTerminalStateSetsCompletedAt() {
-        task.setStatus("SUMMARIZING");
+        task.setStatus(TaskStatus.SUMMARIZING.name());
         when(taskMapper.selectById(1L)).thenReturn(task);
 
-        stateMachine.transition(1L, "SUMMARIZING", "SUCCESS");
+        stateMachine.transition(1L, TaskStatus.SUMMARIZING, TaskStatus.SUCCESS);
 
         assertNotNull(task.getCompletedAt());
     }
@@ -77,13 +79,13 @@ class ReviewStateMachineImplTest {
     @Test
     @DisplayName("重试时重置 errorMsg 和 completedAt")
     void testRetryResetsErrorAndCompleted() {
-        task.setStatus("FAILED");
+        task.setStatus(TaskStatus.FAILED.name());
         task.setErrorMsg("LLM error");
         task.setCompletedAt(LocalDateTime.now());
         task.setProgress(-1);
         when(taskMapper.selectById(1L)).thenReturn(task);
 
-        stateMachine.transition(1L, "FAILED", "PENDING");
+        stateMachine.transition(1L, TaskStatus.FAILED, TaskStatus.PENDING);
 
         assertEquals(0, task.getProgress());
         assertNull(task.getErrorMsg());
@@ -96,34 +98,18 @@ class ReviewStateMachineImplTest {
         when(taskMapper.selectById(1L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.transition(1L, "PENDING", "PARSING"));
+                () -> stateMachine.transition(1L, TaskStatus.PENDING, TaskStatus.PARSING));
         assertEquals(ErrorCode.TASK_NOT_FOUND.getCode(), ex.getCode());
     }
 
     @Test
     @DisplayName("当前状态不匹配时抛异常")
     void testStatusMismatch() {
-        task.setStatus("PARSING");
+        task.setStatus(TaskStatus.PARSING.name());
         when(taskMapper.selectById(1L)).thenReturn(task);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.transition(1L, "PENDING", "PARSING"));
-        assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
-    }
-
-    @Test
-    @DisplayName("非法当前状态抛异常")
-    void testInvalidCurrentStatus() {
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.validateTransition("INVALID", "PENDING"));
-        assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
-    }
-
-    @Test
-    @DisplayName("非法目标状态抛异常")
-    void testInvalidTargetStatus() {
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.validateTransition("PENDING", "INVALID"));
+                () -> stateMachine.transition(1L, TaskStatus.PENDING, TaskStatus.PARSING));
         assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
     }
 
@@ -131,7 +117,7 @@ class ReviewStateMachineImplTest {
     @DisplayName("非法状态转换抛异常（如 PENDING → SUCCESS）")
     void testIllegalTransition() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.validateTransition("PENDING", "SUCCESS"));
+                () -> stateMachine.validateTransition(TaskStatus.PENDING, TaskStatus.SUCCESS));
         assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
     }
 
@@ -139,7 +125,7 @@ class ReviewStateMachineImplTest {
     @DisplayName("SUCCESS 状态不能转换到任何状态")
     void testSuccessHasNoTransitions() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> stateMachine.validateTransition("SUCCESS", "FAILED"));
+                () -> stateMachine.validateTransition(TaskStatus.SUCCESS, TaskStatus.FAILED));
         assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
     }
 }

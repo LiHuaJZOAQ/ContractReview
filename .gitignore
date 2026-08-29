@@ -42,6 +42,7 @@ replay_pid*
 *.yml.local
 *.yaml.local
 .env
+!.env.example
 
 ### Node / Vue ###
 node_modules/
@@ -81,3 +82,4 @@ AGENTS.md
 
 ### User Settings ###
 .quit
+!src/test/resources/contracts/合同示范文本20210105.pdf

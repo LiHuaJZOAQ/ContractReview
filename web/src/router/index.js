@@ -37,6 +37,22 @@ const routes = [
         path: 'history',
         name: 'History',
         component: () => import('@/views/History.vue')
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue')
+      },
+      {
+        path: 'laws',
+        name: 'LawLibrary',
+        component: () => import('@/views/LawLibrary.vue')
+      },
+      {
+        path: 'admin',
+        name: 'Admin',
+        component: () => import('@/views/AdminDashboard.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }

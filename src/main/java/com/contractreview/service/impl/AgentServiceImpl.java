@@ -1,5 +1,8 @@
 package com.contractreview.service.impl;
 
+import com.contractreview.domain.dto.ClassifyResult;
+import com.contractreview.domain.dto.ScanRiskItem;
+import com.contractreview.domain.dto.SummarizeResult;
 import com.contractreview.service.AgentService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,35 +79,32 @@ public class AgentServiceImpl implements AgentService {
             """;
 
     @Override
-    @SuppressWarnings("unchecked")
-    public Map<String, String> classifyContract(String fullText) {
+    public ClassifyResult classifyContract(String fullText) {
         String text = fullText.length() > 3000 ? fullText.substring(0, 3000) : fullText;
         String prompt = String.format(CLASSIFY_PROMPT, text);
         String response = chatClient.prompt().user(prompt).call().content();
-        return (Map<String, String>) (Map) parseMapResult(response);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseMapObjectResult(String response) {
-        if (response == null) return new HashMap<>();
         String json = extractJsonObject(response);
         try {
-            return objectMapper.readValue(json, HashMap.class);
+            return objectMapper.readValue(json, ClassifyResult.class);
         } catch (Exception e) {
-            log.warn("Failed to parse LLM result: {}", e.getMessage());
-            return new HashMap<>();
+            log.warn("Failed to parse classify result: {}", e.getMessage());
+            ClassifyResult fallback = new ClassifyResult();
+            fallback.setContractType("其他");
+            fallback.setUserStance("其他");
+            fallback.setReviewStrategy("标准审查");
+            return fallback;
         }
     }
 
     @Override
-    public List<Map<String, Object>> scanRisks(String chunkContent, List<String> relatedLaws, String strategy) {
+    public List<ScanRiskItem> scanRisks(String chunkContent, List<String> relatedLaws, String strategy) {
         String lawsStr = relatedLaws.isEmpty() ? "无" : String.join("；", relatedLaws);
         String strategyStr = strategy != null ? strategy : "标准审查";
         String prompt = String.format(SCAN_PROMPT, strategyStr, lawsStr, chunkContent);
         String response = chatClient.prompt().user(prompt).call().content();
         String json = extractJsonArray(response);
         try {
-            return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {});
+            return objectMapper.readValue(json, new TypeReference<List<ScanRiskItem>>() {});
         } catch (Exception e) {
             log.warn("Failed to parse Agent B result: {}", e.getMessage());
             return List.of();
@@ -111,7 +112,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     @Override
-    public Map<String, Object> summarizeReport(List<Map<String, Object>> allRisks, String contractType) {
+    public SummarizeResult summarizeReport(List<ScanRiskItem> allRisks, String contractType) {
         String risksJson;
         try {
             risksJson = objectMapper.writeValueAsString(allRisks);
@@ -120,33 +121,31 @@ public class AgentServiceImpl implements AgentService {
         }
         String prompt = String.format(SUMMARIZE_PROMPT, contractType, risksJson);
         String response = chatClient.prompt().user(prompt).call().content();
-        Map<String, Object> result = parseMapObjectResult(response);
-        if (result != null && !result.containsKey("risks")) {
-            result.put("risks", allRisks);
+        String json = extractJsonObject(response);
+        SummarizeResult result;
+        try {
+            result = objectMapper.readValue(json, SummarizeResult.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse summarize result: {}", e.getMessage());
+            result = new SummarizeResult();
+            result.setSummary("");
+            result.setRisks(new ArrayList<>());
         }
-        if (result != null && !result.containsKey("riskCount")) {
+        if (result.getRisks() == null || result.getRisks().isEmpty()) {
+            result.setRisks(allRisks);
+        }
+        if (result.getRiskCount() == null) {
             Map<String, Integer> count = new HashMap<>();
             count.put("high", 0);
             count.put("medium", 0);
             count.put("low", 0);
-            result.put("riskCount", count);
+            result.setRiskCount(count);
         }
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, String> parseMapResult(String response) {
-        if (response == null) return Map.of();
-        String json = extractJsonObject(response);
-        try {
-            return objectMapper.readValue(json, HashMap.class);
-        } catch (Exception e) {
-            log.warn("Failed to parse LLM result: {}", e.getMessage());
-            return Map.of();
-        }
-    }
-
     private String extractJsonObject(String text) {
+        if (text == null) return "";
         int start = text.indexOf('{');
         if (start < 0) return text;
         int depth = 0;
@@ -159,6 +158,7 @@ public class AgentServiceImpl implements AgentService {
     }
 
     private String extractJsonArray(String text) {
+        if (text == null) return "[]";
         Pattern p = Pattern.compile("\\[.*\\]", Pattern.DOTALL);
         Matcher m = p.matcher(text);
         if (m.find()) return m.group();
