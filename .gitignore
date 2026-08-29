@@ -78,3 +78,6 @@ AGENTS.md
 
 ### Binary files ###
 *.pdf
+
+### User Settings ###
+.quit
