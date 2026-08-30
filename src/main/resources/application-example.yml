@@ -31,6 +31,9 @@ spring:
     openai:
       base-url: ${LLM_API_BASE_URL:https://your-api-address/v1}
       api-key: ${LLM_API_KEY:sk-your-api-key-here}
+      embedding:
+        options:
+          model: text-embedding-3-small
       chat:
         options:
           model: gpt-4o-mini
