@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `risk_item` (
 CREATE TABLE IF NOT EXISTS `review_report` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `task_id` BIGINT NOT NULL,
-    `summary` TEXT NOT NULL,
+    `summary` MEDIUMTEXT NOT NULL,
     `risk_count_high` INT NOT NULL DEFAULT 0,
     `risk_count_medium` INT NOT NULL DEFAULT 0,
     `risk_count_low` INT NOT NULL DEFAULT 0,
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS `review_process_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `task_id` BIGINT NOT NULL,
     `agent` VARCHAR(50) NOT NULL COMMENT 'Agent 名称（如 Agent-A 合同分类）',
-    `content` TEXT NOT NULL COMMENT 'Agent 输出内容',
+    `content` MEDIUMTEXT NOT NULL COMMENT 'Agent 输出内容',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `deleted` TINYINT NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`),
