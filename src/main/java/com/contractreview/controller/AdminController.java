@@ -2,6 +2,8 @@ package com.contractreview.controller;
 
 import com.contractreview.common.R;
 import com.contractreview.domain.dto.AdminUserDto;
+import com.contractreview.domain.dto.OperationLogDto;
+import com.contractreview.domain.dto.SystemMonitorDto;
 import com.contractreview.domain.dto.SystemStatsDto;
 import com.contractreview.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,21 @@ public class AdminController {
     @Operation(summary = "系统统计", description = "获取系统整体统计数据")
     public R<SystemStatsDto> getSystemStats() {
         return R.ok(adminService.getSystemStats());
+    }
+
+    @GetMapping("/monitor")
+    @Operation(summary = "系统监控", description = "获取JVM内存线程CPU等运行时指标")
+    public R<SystemMonitorDto> getSystemMonitor() {
+        return R.ok(adminService.getSystemMonitor());
+    }
+
+    @GetMapping("/operations")
+    @Operation(summary = "操作日志", description = "分页查询用户操作日志")
+    public R<List<OperationLogDto>> listOperations(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String action) {
+        return R.ok(adminService.listOperationLogs(page, size, action));
     }
 
     @GetMapping("/users")

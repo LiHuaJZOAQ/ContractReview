@@ -15,6 +15,16 @@ const routes = [
     meta: { guest: true }
   },
   {
+    path: '/403',
+    name: 'Forbidden',
+    component: () => import('@/views/Forbidden.vue')
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/NotFound.vue')
+  },
+  {
     path: '/',
     component: () => import('@/views/Layout.vue'),
     meta: { requiresAuth: true },
@@ -53,6 +63,12 @@ const routes = [
         name: 'Admin',
         component: () => import('@/views/AdminDashboard.vue'),
         meta: { requiresAdmin: true }
+      },
+      {
+        path: 'monitor',
+        name: 'Monitor',
+        component: () => import('@/views/Monitor.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }
@@ -69,6 +85,8 @@ router.beforeEach((to, _from, next) => {
     next('/login')
   } else if (to.meta.guest && auth.isAuthenticated) {
     next('/')
+  } else if (to.meta.requiresAdmin && auth.role !== 'ADMIN') {
+    next('/403')
   } else {
     next()
   }

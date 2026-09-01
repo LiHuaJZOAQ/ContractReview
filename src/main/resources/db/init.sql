@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `risk_item` (
 CREATE TABLE IF NOT EXISTS `review_report` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '报告主键ID',
     `task_id` BIGINT NOT NULL COMMENT '关联的审查任务ID',
-    `summary` TEXT NOT NULL COMMENT '报告总结文本',
+    `summary` MEDIUMTEXT NOT NULL COMMENT '报告总结文本',
     `risk_count_high` INT NOT NULL DEFAULT 0 COMMENT '高风险项数量',
     `risk_count_medium` INT NOT NULL DEFAULT 0 COMMENT '中风险项数量',
     `risk_count_low` INT NOT NULL DEFAULT 0 COMMENT '低风险项数量',
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS `review_process_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志主键ID',
     `task_id` BIGINT NOT NULL COMMENT '关联的审查任务ID',
     `agent` VARCHAR(50) NOT NULL COMMENT 'Agent 名称，如：Agent-A 合同分类、Agent-B 风险识别',
-    `content` TEXT NOT NULL COMMENT 'Agent 输出的日志内容',
+    `content` MEDIUMTEXT NOT NULL COMMENT 'Agent 输出的日志内容',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '日志记录时间',
     `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标志：0-正常 1-已删除',
     PRIMARY KEY (`id`),

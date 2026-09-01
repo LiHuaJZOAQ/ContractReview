@@ -86,7 +86,8 @@
         </label>
       </div>
 
-      <div v-if="previewText" class="preview-section">
+      <transition name="card-slide-up" mode="out-in">
+        <div v-if="previewText" key="preview" class="preview-section">
         <div class="section-label">文本预览</div>
         <div class="preview-block">
           <pre class="preview-text">{{ previewText }}</pre>
@@ -98,7 +99,8 @@
             {{ submitting ? '提交中...' : '提交审查' }}
           </button>
         </div>
-      </div>
+        </div>
+      </transition>
     </div>
 
     <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" @error="onError" />
