@@ -31,6 +31,13 @@ spring:
     openai:
       base-url: ${LLM_API_BASE_URL:https://your-api-address/v1}
       api-key: ${LLM_API_KEY:sk-your-api-key-here}
+      embedding:
+        # 如果使用独立的embedding API （比如Ollama等），可以使用下面的配置
+        base-url: http://localhost:11434/v1
+        api-key: "none"
+        # 指定embedding模型
+        options:
+          model: text-embedding-3-small
       chat:
         options:
           model: gpt-4o-mini
