@@ -13,4 +13,5 @@ public class AuthResponse {
     private long expiresIn;
     private int reviewQuota;
     private int quotaTotal;
+    private String role;
 }
