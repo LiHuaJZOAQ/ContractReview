@@ -42,13 +42,12 @@ axios.interceptors.response.use(
           isRefreshing = true
           try {
             const res = await axios.post('/auth/refresh', { refreshToken })
-            if (res.data.code === 0) {
-              const { token, refreshToken: newRefresh } = res.data.data
-              localStorage.setItem('token', token)
-              localStorage.setItem('refreshToken', newRefresh)
+            if (res && res.token) {
+              localStorage.setItem('token', res.token)
+              localStorage.setItem('refreshToken', res.refreshToken)
               isRefreshing = false
-              onRefreshed(token)
-              error.config.headers.Authorization = `Bearer ${token}`
+              onRefreshed(res.token)
+              error.config.headers.Authorization = `Bearer ${res.token}`
               return axios(error.config)
             }
           } catch {
