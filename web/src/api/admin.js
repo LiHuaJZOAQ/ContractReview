@@ -4,6 +4,16 @@ export function getSystemStats() {
   return axios.get('/admin/stats')
 }
 
+export function getSystemMonitor() {
+  return axios.get('/admin/monitor')
+}
+
+export function getOperationLogs(page = 1, size = 20, action = '') {
+  const params = { page, size }
+  if (action) params.action = action
+  return axios.get('/admin/operations', { params })
+}
+
 export function getAdminUsers() {
   return axios.get('/admin/users')
 }
