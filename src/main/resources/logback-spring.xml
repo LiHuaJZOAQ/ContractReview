@@ -5,22 +5,32 @@
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="contract-review"/>
     <springProperty scope="context" name="LOG_DIR" source="logging.file.path" defaultValue="./logs"/>
 
-    <appender name="FILE_FULL" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/contract-review.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_DIR}/contract-review.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
-            <maxFileSize>50MB</maxFileSize>
+    <timestamp key="startTime" datePattern="yyyy-MM-dd-HH-mm-ss"/>
+
+    <conversionRule conversionWord="ex" converterClass="com.contractreview.util.ShortThrowableConverter"/>
+
+    <appender name="FILE_DEV" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_DIR}/contract-app-dev-${startTime}.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{2000}).+$', '$1...[truncated by logback]'}%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE_PROD" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/contract-app-prod.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/contract-app-prod.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
             <maxHistory>30</maxHistory>
             <totalSizeCap>5GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{2000}).+$', '$1...[truncated by logback]'}%n%ex</pattern>
         </encoder>
     </appender>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %5p [%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} %5p [%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{300}).+$', '$1...[truncated]'}%n%ex</pattern>
         </encoder>
     </appender>
 
@@ -33,21 +43,25 @@
 
     <springProfile name="dev">
         <root level="INFO">
-            <appender-ref ref="FILE_FULL"/>
+            <appender-ref ref="FILE_DEV"/>
             <appender-ref ref="ASYNC_CONSOLE"/>
         </root>
         <logger name="com.contractreview" level="DEBUG"/>
         <logger name="org.springframework" level="WARN"/>
         <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.springframework.amqp" level="WARN"/>
+        <logger name="org.springframework.ai" level="WARN"/>
     </springProfile>
 
     <springProfile name="prod">
         <root level="INFO">
-            <appender-ref ref="FILE_FULL"/>
+            <appender-ref ref="FILE_PROD"/>
             <appender-ref ref="ASYNC_CONSOLE"/>
         </root>
         <logger name="com.contractreview" level="INFO"/>
         <logger name="org.springframework" level="WARN"/>
         <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.springframework.amqp" level="WARN"/>
+        <logger name="org.springframework.ai" level="WARN"/>
     </springProfile>
 </configuration>
