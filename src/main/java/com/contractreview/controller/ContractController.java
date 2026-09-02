@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import java.util.List;
 
@@ -116,8 +116,8 @@ public class ContractController {
     }
 
     @GetMapping("/{taskId}/progress")
-    @Operation(summary = "实时进度流", description = "SSE 实时推送审查进度事件")
-    public SseEmitter progress(@PathVariable Long taskId) {
+    @Operation(summary = "实时进度流", description = "NDJSON 流式推送审查进度事件")
+    public ResponseBodyEmitter progress(@PathVariable Long taskId) {
         Long userId = UserContext.getUserId();
         contractService.getStatus(taskId, userId);
         return sseService.createEmitter(taskId);
