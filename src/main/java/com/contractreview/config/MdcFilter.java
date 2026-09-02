@@ -1,5 +1,6 @@
 package com.contractreview.config;
 
+import com.contractreview.security.UserContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +34,12 @@ public class MdcFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
+            if (MDC.get(USER_ID) == null) {
+                Long userId = UserContext.getUserId();
+                if (userId != null) {
+                    MDC.put(USER_ID, String.valueOf(userId));
+                }
+            }
             MDC.remove(TRACE_ID);
             MDC.remove(USER_ID);
         }
