@@ -3,6 +3,7 @@ package com.contractreview.exception;
 import com.contractreview.common.BusinessException;
 import com.contractreview.common.R;
 import com.contractreview.domain.enums.ErrorCode;
+import com.contractreview.util.LogTruncator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -70,7 +71,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<R<Void>> handleUnknown(Exception e) {
-        log.error("Unexpected error: {}", e.getMessage(), e);
+        String msg = e.getMessage() != null ? LogTruncator.truncate(e.getMessage(), 500) : "unknown";
+        String stack = LogTruncator.truncateStack(e, 2000);
+        log.error("Unexpected error: {} | stack: {}", msg, stack);
         R<Void> r = R.error(ErrorCode.INTERNAL_ERROR.getCode(), "服务器内部错误");
         r.setRequestId(UUID.randomUUID().toString().replace("-", ""));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(r);
