@@ -74,7 +74,12 @@ const stages = ref([
   { key: 'summarizing', label: '汇总报告', status: 'pending', detail: '' },
 ])
 
-let eventSource = null
+let streamReader = null
+let streamAbortController = null
+let reconnectAttempt = 0
+
+const MAX_RECONNECT = 3
+const stageKeys = ['parsing', 'retrieving', 'reviewing', 'summarizing']
 
 function formatTime(sec) {
   const m = String(Math.floor(sec / 60)).padStart(2, '0')
@@ -114,73 +119,125 @@ function reset() {
   elapsedStr.value = '00:00'
 }
 
-function open() {
+async function open() {
   reset()
   visible.value = true
   startTimer()
+  await connectStream()
+}
 
+async function connectStream() {
   const token = localStorage.getItem('token')
-  eventSource = new EventSource(`/api/v1/contract/${props.taskId}/progress?token=${token}`)
-
-  eventSource.addEventListener('progress', e => {
-    const data = JSON.parse(e.data)
-    percentage.value = data.progress
-
-    const status = (data.status || '').toLowerCase()
-    const stageKeys = ['parsing', 'retrieving', 'reviewing', 'summarizing']
-    const idx = stageKeys.indexOf(status)
-
-    stages.value.forEach((s, i) => {
-      if (i < idx) s.status = 'done'
-      else if (i === idx) {
-        s.status = 'active'
-        if (data.message) s.detail = data.message
-      }
+  streamAbortController = new AbortController()
+  let response
+  try {
+    response = await fetch(`/api/v1/contract/${props.taskId}/progress`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: streamAbortController.signal
     })
-  })
+  } catch (e) {
+    return handleStreamFailure(e)
+  }
 
-  eventSource.addEventListener('llm_output', e => {
-    const data = JSON.parse(e.data)
-    outputs.value.push({ agent: data.agent, content: data.content })
-    nextTick(() => {
-      if (outputRef.value) {
-        outputRef.value.scrollTop = outputRef.value.scrollHeight
-      }
-    })
-  })
-
-  eventSource.addEventListener('complete', () => {
-    percentage.value = 100
-    stages.value.forEach(s => { s.status = 'done' })
-    stopTimer()
-    emit('complete')
-  })
-
-  eventSource.addEventListener('error', e => {
-    let msg = '审查失败'
-    try {
-      const data = JSON.parse(e.data)
-      msg = data.message || msg
-    } catch {}
-    const activeStage = stages.value.find(s => s.status === 'active')
-    if (activeStage) activeStage.status = 'error'
-    stopTimer()
-    emit('error', msg)
-  })
-
-  eventSource.onerror = () => {
-    if (timerRunning.value) {
+  if (!response.ok) {
+    if (response.status === 401) {
       stopTimer()
-      emit('error', '连接断开')
+      emit('error', '登录已过期')
+      return
+    }
+    return handleStreamFailure(new Error(`HTTP ${response.status}`))
+  }
+
+  try {
+    await readNdjsonStream(response.body)
+  } catch (e) {
+    handleStreamFailure(e)
+  }
+}
+
+async function readNdjsonStream(body) {
+  streamReader = body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  while (true) {
+    const { done, value } = await streamReader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        handleMessage(JSON.parse(trimmed))
+      } catch (e) {
+        // 忽略非 JSON 行
+      }
     }
   }
 }
 
-function close() {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
+function handleMessage(data) {
+  switch (data.type) {
+    case 'progress': {
+      percentage.value = data.progress
+      const status = (data.status || '').toLowerCase()
+      const idx = stageKeys.indexOf(status)
+      stages.value.forEach((s, i) => {
+        if (i < idx) s.status = 'done'
+        else if (i === idx) {
+          s.status = 'active'
+          if (data.message) s.detail = data.message
+        }
+      })
+      break
+    }
+    case 'llm_output': {
+      outputs.value.push({ agent: data.agent, content: data.content })
+      nextTick(() => {
+        if (outputRef.value) outputRef.value.scrollTop = outputRef.value.scrollHeight
+      })
+      break
+    }
+    case 'complete': {
+      percentage.value = 100
+      stages.value.forEach(s => { s.status = 'done' })
+      stopTimer()
+      emit('complete')
+      break
+    }
+    case 'error': {
+      const activeStage = stages.value.find(s => s.status === 'active')
+      if (activeStage) activeStage.status = 'error'
+      stopTimer()
+      emit('error', data.message || '审查失败')
+      break
+    }
   }
+}
+
+function handleStreamFailure(err) {
+  if (streamAbortController && streamAbortController.signal.aborted) return
+  if (reconnectAttempt < MAX_RECONNECT) {
+    const delay = Math.pow(2, reconnectAttempt) * 1000
+    reconnectAttempt++
+    setTimeout(connectStream, delay)
+    return
+  }
+  stopTimer()
+  emit('error', err && err.message ? err.message : '连接断开')
+}
+
+function close() {
+  if (streamAbortController) {
+    streamAbortController.abort()
+    streamAbortController = null
+  }
+  if (streamReader) {
+    streamReader.cancel().catch(() => {})
+    streamReader = null
+  }
+  reconnectAttempt = MAX_RECONNECT
   stopTimer()
 }
 
