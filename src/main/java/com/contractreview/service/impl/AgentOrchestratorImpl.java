@@ -6,6 +6,7 @@ import com.contractreview.domain.dto.SummarizeResult;
 import com.contractreview.domain.entity.ReviewProcessLog;
 import com.contractreview.domain.enums.TaskStatus;
 import com.contractreview.mapper.ReviewProcessLogMapper;
+import com.contractreview.security.UserContext;
 import com.contractreview.service.AgentOrchestrator;
 import com.contractreview.service.AgentService;
 import com.contractreview.service.RagService;
@@ -70,7 +71,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             for (int i = 0; i < totalChunks; i++) {
                 String chunk = finalChunks.get(i);
                 final int index = i;
-                CompletableFuture<List<ScanRiskItem>> future = CompletableFuture.supplyAsync(() -> {
+                CompletableFuture<List<ScanRiskItem>> future = UserContext.supplyAsync(() -> {
                     try {
                         semaphore.acquire();
                         try {
