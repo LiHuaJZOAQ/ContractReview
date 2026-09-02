@@ -33,7 +33,15 @@ public class AccessLogFilter extends OncePerRequestFilter {
             long duration = System.currentTimeMillis() - start;
             int status = response.getStatus();
             Long userId = UserContext.getUserId();
-            log.info("ACCESS {} {} {} {}ms userId={}", method, uri, status, duration, userId);
+            if (log.isDebugEnabled() || !isStreamingPath(uri)) {
+                log.info("ACCESS {} {} {} {}ms userId={}", method, uri, status, duration, userId);
+            } else {
+                log.debug("ACCESS {} {} {} {}ms userId={}", method, uri, status, duration, userId);
+            }
         }
+    }
+
+    private boolean isStreamingPath(String uri) {
+        return uri != null && uri.matches("^/api/v1/contract/\\d+/progress$");
     }
 }
