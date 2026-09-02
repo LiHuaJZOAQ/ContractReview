@@ -1,5 +1,6 @@
 package com.contractreview.config;
 
+import com.contractreview.util.LogTruncator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +35,7 @@ public class SpringAiConfig {
                 }
                 try {
                     String response = chatClient.prompt()
-                            .user("请回复OK")
+                            .user("reply OK without any other words")
                             .call()
                             .content();
                     if (response != null && !response.isBlank()) {
@@ -43,8 +44,9 @@ public class SpringAiConfig {
                         log.warn("LLM API returned empty response, please check model endpoint");
                     }
                 } catch (Exception e) {
-                    log.error("LLM API connection test failed: {} (url={})", e.getMessage(), baseUrl);
+                    log.error("LLM API connection test failed: {} (url={})", LogTruncator.truncate(e.getMessage(), 200), baseUrl);
                     log.error("Please verify LLM_API_BASE_URL and LLM_API_KEY environment variables");
+                    log.error("请检查LLM_API_BASE_URL是否以v1结尾，正确写法不带v1后缀");
                 }
             }
         };
