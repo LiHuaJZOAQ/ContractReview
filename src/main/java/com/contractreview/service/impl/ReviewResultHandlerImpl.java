@@ -15,6 +15,7 @@ import com.contractreview.mapper.UserMapper;
 import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
+import com.contractreview.util.LogTruncator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,7 +61,7 @@ public class ReviewResultHandlerImpl implements ReviewResultHandler {
             sseService.sendComplete(taskId, taskId.toString());
             log.info("Review completed successfully for task {}", taskId);
         } catch (Exception e) {
-            log.error("Failed to save review result for task {}: {}", taskId, e.getMessage());
+            log.error("Failed to save review result for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
             handleFailure(taskId, null, new ReviewMessage(taskId, null, 0), e);
         }
     }
@@ -68,7 +69,7 @@ public class ReviewResultHandlerImpl implements ReviewResultHandler {
     @Override
     @Transactional
     public void handleFailure(Long taskId, Long userId, ReviewMessage message, Throwable throwable) {
-        log.error("Review failed for task {}: {}", taskId, throwable.getMessage());
+        log.error("Review failed for task {}: {}", taskId, LogTruncator.truncate(throwable.getMessage(), 200));
 
         try {
             ReviewTask task = taskMapper.selectById(taskId);
@@ -94,7 +95,7 @@ public class ReviewResultHandlerImpl implements ReviewResultHandler {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to handle failure for task {}: {}", taskId, e.getMessage());
+            log.error("Failed to handle failure for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
         }
     }
 

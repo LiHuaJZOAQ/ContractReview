@@ -13,6 +13,7 @@ import com.contractreview.service.RagService;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.contractreview.util.ChunkingUtil;
+import com.contractreview.util.LogTruncator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,7 +136,7 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             return CompletableFuture.completedFuture(report);
 
         } catch (Exception e) {
-            log.error("Review orchestration failed for task {}: {}", taskId, e.getMessage());
+            log.error("Review orchestration failed for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
             sseService.sendError(taskId, "审查失败: " + e.getMessage());
             return CompletableFuture.failedFuture(e);
         }

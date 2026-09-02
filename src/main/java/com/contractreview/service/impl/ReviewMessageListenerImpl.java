@@ -12,6 +12,7 @@ import com.contractreview.service.ReviewResultHandler;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.contractreview.common.BusinessException;
+import com.contractreview.util.LogTruncator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
@@ -73,7 +74,7 @@ public class ReviewMessageListenerImpl implements ReviewMessageListener {
                             }
                             channel.basicAck(deliveryTag, false);
                         } catch (Exception e) {
-                            log.error("Failed to ack/nack message for task {}: {}", taskId, e.getMessage());
+                            log.error("Failed to ack/nack message for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
                             try {
                                 channel.basicNack(deliveryTag, false, false);
                             } catch (Exception ex) {
@@ -86,7 +87,7 @@ public class ReviewMessageListenerImpl implements ReviewMessageListener {
             log.warn("Invalid state transition for task {}: {}", taskId, e.getMessage());
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
-            log.error("Failed to start review for task {}: {}", taskId, e.getMessage());
+            log.error("Failed to start review for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
             reviewResultHandler.handleFailure(taskId, userId, message, e);
             channel.basicNack(deliveryTag, false, false);
         }
@@ -130,7 +131,7 @@ public class ReviewMessageListenerImpl implements ReviewMessageListener {
                 sseService.sendError(taskId, "审查失败，重试次数已达上限");
                 log.warn("Task {} failed after {} retries", taskId, maxRetryCount);
             } catch (Exception e) {
-                log.error("Failed to mark task {} as FAILED: {}", taskId, e.getMessage());
+                log.error("Failed to mark task {} as FAILED: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
             }
         }
     }

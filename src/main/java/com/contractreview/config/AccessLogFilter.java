@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -32,13 +34,21 @@ public class AccessLogFilter extends OncePerRequestFilter {
         } finally {
             long duration = System.currentTimeMillis() - start;
             int status = response.getStatus();
-            Long userId = UserContext.getUserId();
+            Long userId = readUserId();
             if (log.isDebugEnabled() || !isStreamingPath(uri)) {
                 log.info("ACCESS {} {} {} {}ms userId={}", method, uri, status, duration, userId);
             } else {
                 log.debug("ACCESS {} {} {} {}ms userId={}", method, uri, status, duration, userId);
             }
         }
+    }
+
+    private Long readUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Long l) {
+            return l;
+        }
+        return UserContext.getUserId();
     }
 
     private boolean isStreamingPath(String uri) {

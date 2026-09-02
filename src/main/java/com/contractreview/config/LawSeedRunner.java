@@ -1,6 +1,7 @@
 package com.contractreview.config;
 
 import com.contractreview.util.ChunkingUtil;
+import com.contractreview.util.LogTruncator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -85,7 +86,7 @@ public class LawSeedRunner implements ApplicationRunner {
             vectorStore.add(allDocs);
             log.info("Successfully seeded {} law chunks into Chroma", allDocs.size());
         } catch (Exception e) {
-            log.error("Failed to seed laws into Chroma: {}", e.getMessage());
+            log.error("Failed to seed laws into Chroma: {}", LogTruncator.truncate(e.getMessage(), 200));
         }
     }
 }
