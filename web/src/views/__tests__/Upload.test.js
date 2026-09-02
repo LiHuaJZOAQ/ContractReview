@@ -6,7 +6,10 @@ const mockPush = vi.fn()
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
   useRoute: () => ({ params: {} }),
+  RouterLink: { template: '<a><slot /></a>' },
 }))
+
+vi.mock('@/router', () => ({ default: { push: mockPush } }))
 
 vi.mock('@element-plus/icons-vue', () => ({ UploadFilled: { template: '<span />' } }))
 
