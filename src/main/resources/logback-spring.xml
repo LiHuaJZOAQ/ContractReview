@@ -3,36 +3,51 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="contract-review"/>
+    <springProperty scope="context" name="LOG_DIR" source="logging.file.path" defaultValue="./logs"/>
 
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="FILE_FULL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/contract-review.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/contract-review.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n</pattern>
         </encoder>
     </appender>
 
-    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <pattern>{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSS}","level":"%level","logger":"%logger{36}","traceId":"%X{traceId:-}","userId":"%X{userId:-}","message":"%msg"}%n</pattern>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %5p [%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n</pattern>
         </encoder>
+    </appender>
+
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CONSOLE"/>
     </appender>
 
     <springProfile name="dev">
         <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE_FULL"/>
+            <appender-ref ref="ASYNC_CONSOLE"/>
         </root>
+        <logger name="com.contractreview" level="DEBUG"/>
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.hibernate" level="WARN"/>
     </springProfile>
 
     <springProfile name="prod">
-        <root level="WARN">
-            <appender-ref ref="JSON_CONSOLE"/>
+        <root level="INFO">
+            <appender-ref ref="FILE_FULL"/>
+            <appender-ref ref="ASYNC_CONSOLE"/>
         </root>
         <logger name="com.contractreview" level="INFO"/>
         <logger name="org.springframework" level="WARN"/>
-    </springProfile>
-
-    <springProfile name="default">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-        </root>
+        <logger name="org.hibernate" level="WARN"/>
     </springProfile>
 </configuration>
