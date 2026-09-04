@@ -99,8 +99,21 @@ public class LawServiceImpl implements LawService {
         if (law == null) {
             throw new BusinessException(404, "法律法规不存在");
         }
-        law.setStatus(law.getStatus() == 1 ? 0 : 1);
+        boolean wasEnabled = law.getStatus() != null && law.getStatus() == 1;
+        law.setStatus(wasEnabled ? 0 : 1);
         lawMapper.updateById(law);
+        try {
+            if (wasEnabled) {
+                removeLawFromChroma(law.getId());
+                log.info("Law '{}' disabled, removed from Chroma", law.getTitle());
+            } else {
+                indexLawToChroma(law);
+                log.info("Law '{}' enabled, indexed into Chroma", law.getTitle());
+            }
+        } catch (Exception e) {
+            log.error("Chroma sync failed after toggling law {} (status now={}): {}",
+                    law.getId(), law.getStatus(), e.getMessage(), e);
+        }
     }
 
     @Override
@@ -121,6 +134,7 @@ public class LawServiceImpl implements LawService {
                 Map<String, Object> metadata = new HashMap<>();
                 metadata.put("lawName", law.getTitle());
                 metadata.put("lawId", law.getId());
+                metadata.put("enabled", law.getStatus() != null && law.getStatus() == 1);
                 metadata.put("chunkIndex", i);
                 metadata.put("totalChunks", chunks.size());
                 docs.add(new Document(chunks.get(i), metadata));
@@ -135,7 +149,7 @@ public class LawServiceImpl implements LawService {
     private void removeLawFromChroma(Long lawId) {
         try {
             List<Document> results = vectorStore.similaritySearch(
-                    SearchRequest.query("test").withTopK(1000));
+                    SearchRequest.query("法律").withTopK(1000));
             List<Document> toDelete = results.stream()
                     .filter(doc -> {
                         Object id = doc.getMetadata().get("lawId");

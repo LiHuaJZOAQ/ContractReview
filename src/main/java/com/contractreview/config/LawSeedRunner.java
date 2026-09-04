@@ -1,12 +1,12 @@
 package com.contractreview.config;
 
+import com.contractreview.domain.entity.Law;
+import com.contractreview.mapper.LawMapper;
 import com.contractreview.util.ChunkingUtil;
-import com.contractreview.util.LogTruncator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class LawSeedRunner implements ApplicationRunner {
 
     private final VectorStore vectorStore;
+    private final LawMapper lawMapper;
 
     @Value("${contract.review.law.seed-enabled:true}")
     private boolean seedEnabled;
@@ -40,15 +41,8 @@ public class LawSeedRunner implements ApplicationRunner {
             return;
         }
 
-        try {
-            List<Document> existing = vectorStore.similaritySearch(
-                    SearchRequest.query("test").withTopK(1));
-            if (!existing.isEmpty()) {
-                log.info("Chroma already has data, skipping law seeding");
-                return;
-            }
-        } catch (Exception e) {
-            log.warn("Chroma not available yet, will retry on next startup: {}", e.getMessage());
+        if (lawMapper.selectCount(null) > 0) {
+            log.info("law table not empty, skip classpath seeding (DB is source of truth)");
             return;
         }
 
@@ -61,32 +55,46 @@ public class LawSeedRunner implements ApplicationRunner {
                 return;
             }
 
-            List<Document> allDocs = new ArrayList<>();
             for (Resource resource : resources) {
                 String lawName = resource.getFilename();
-                log.info("Loading law: {}", lawName);
-
                 String content;
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
                     content = reader.lines().collect(Collectors.joining("\n"));
                 }
 
-                List<String> chunks = ChunkingUtil.chunkByClause(content);
-                for (int i = 0; i < chunks.size(); i++) {
-                    Map<String, Object> metadata = new HashMap<>();
-                    metadata.put("lawName", lawName);
-                    metadata.put("chunkIndex", i);
-                    metadata.put("totalChunks", chunks.size());
-                    allDocs.add(new Document(chunks.get(i), metadata));
-                }
-                log.info("Chunked {} into {} parts", lawName, chunks.size());
-            }
+                Law law = new Law();
+                law.setTitle(lawName.replace(".txt", ""));
+                law.setCategory("seed");
+                law.setContent(content);
+                law.setStatus(1);
+                law.setCreatedBy(null);
+                lawMapper.insert(law);
 
-            vectorStore.add(allDocs);
-            log.info("Successfully seeded {} law chunks into Chroma", allDocs.size());
+                seedChunksToChroma(law);
+                log.info("Seeded '{}' ({} chars) from classpath", law.getTitle(), content.length());
+            }
         } catch (Exception e) {
-            log.error("Failed to seed laws into Chroma: {}", LogTruncator.truncate(e.getMessage(), 200));
+            log.error("Failed to seed laws", e);
+        }
+    }
+
+    private void seedChunksToChroma(Law law) {
+        try {
+            List<String> chunks = ChunkingUtil.chunkByClause(law.getContent());
+            List<Document> docs = new ArrayList<>();
+            for (int i = 0; i < chunks.size(); i++) {
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put("lawName", law.getTitle());
+                metadata.put("lawId", law.getId());
+                metadata.put("enabled", true);
+                metadata.put("chunkIndex", i);
+                metadata.put("totalChunks", chunks.size());
+                docs.add(new Document(chunks.get(i), metadata));
+            }
+            vectorStore.add(docs);
+        } catch (Exception e) {
+            log.warn("Failed to seed chunks for '{}': {}", law.getTitle(), e.getMessage());
         }
     }
 }
