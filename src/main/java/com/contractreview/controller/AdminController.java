@@ -57,9 +57,30 @@ public class AdminController {
     }
 
     @PutMapping("/users/{userId}/quota")
-    @Operation(summary = "重置用户额度")
+    @Operation(summary = "设置用户积分", description = "将指定用户的积分直接设为 quota 值（不再有总额/剩余概念）")
     public R<Void> resetUserQuota(@PathVariable Long userId, @RequestBody Map<String, Integer> body) {
-        adminService.resetUserQuota(userId, body.getOrDefault("quota", 10));
+        Integer quota = body.get("quota");
+        if (quota == null) {
+            throw new com.contractreview.common.BusinessException(400, "必须传入 quota 字段");
+        }
+        adminService.resetUserQuota(userId, quota);
+        return R.ok();
+    }
+
+    @GetMapping("/quota-default")
+    @Operation(summary = "查询新用户默认积分", description = "管理员面板展示的当前默认积分")
+    public R<Map<String, Integer>> getDefaultQuota() {
+        return R.ok(Map.of("quota", adminService.getDefaultQuota()));
+    }
+
+    @PutMapping("/quota-default")
+    @Operation(summary = "设置新用户默认积分", description = "调整注册时给新用户的默认积分，仅影响新注册用户")
+    public R<Void> setDefaultQuota(@RequestBody Map<String, Integer> body) {
+        Integer quota = body.get("quota");
+        if (quota == null) {
+            throw new com.contractreview.common.BusinessException(400, "必须传入 quota 字段");
+        }
+        adminService.setDefaultQuota(quota);
         return R.ok();
     }
 

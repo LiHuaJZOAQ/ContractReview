@@ -5,6 +5,7 @@ import com.contractreview.domain.dto.AuthResponse;
 import com.contractreview.domain.entity.User;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.security.JwtUtils;
+import com.contractreview.service.SystemConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -35,13 +37,16 @@ class AuthServiceImplTest {
     private RedisTemplate<String, Object> redisTemplate;
     @Mock
     private ValueOperations<String, Object> valueOps;
+    @Mock
+    private SystemConfigService systemConfigService;
 
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        authService = new AuthServiceImpl(userMapper, jwtUtils, redisTemplate);
+        when(systemConfigService.getInt(eq("default_quota"), anyInt())).thenReturn(100);
+        authService = new AuthServiceImpl(userMapper, jwtUtils, redisTemplate, systemConfigService);
     }
 
     @Test

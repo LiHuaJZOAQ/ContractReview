@@ -7,6 +7,7 @@ import com.contractreview.domain.enums.ErrorCode;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.security.JwtUtils;
 import com.contractreview.service.AuthService;
+import com.contractreview.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -23,6 +24,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final JwtUtils jwtUtils;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final SystemConfigService systemConfigService;
 
     @Override
     @Transactional
@@ -40,7 +42,8 @@ public class AuthServiceImpl implements AuthService {
         user.setUsername(username);
         user.setPasswordHash(org.springframework.security.crypto.bcrypt.BCrypt.hashpw(password,
                 org.springframework.security.crypto.bcrypt.BCrypt.gensalt()));
-        user.setReviewQuota(DEFAULT_QUOTA);
+        int defaultQuota = systemConfigService.getInt("default_quota", 100);
+        user.setReviewQuota(defaultQuota);
         user.setRole("USER");
         user.setVersion(0);
         userMapper.insert(user);
@@ -100,8 +103,6 @@ public class AuthServiceImpl implements AuthService {
 
         return buildAuthResponse(user, newToken, newRefreshToken);
     }
-
-    private static final int DEFAULT_QUOTA = 10;
 
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
         return new AuthResponse(user.getId(), user.getUsername(), token, refreshToken,

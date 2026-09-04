@@ -15,6 +15,7 @@ import com.contractreview.mapper.OperationLogMapper;
 import com.contractreview.mapper.ReviewTaskMapper;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.service.AdminService;
+import com.contractreview.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class AdminServiceImpl implements AdminService {
     private final ReviewTaskMapper taskMapper;
     private final LawMapper lawMapper;
     private final OperationLogMapper operationLogMapper;
+    private final SystemConfigService systemConfigService;
 
     @Override
     public SystemStatsDto getSystemStats() {
@@ -98,6 +100,19 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(404, "用户不存在");
         }
         userMapper.deleteById(userId);
+    }
+
+    @Override
+    public int getDefaultQuota() {
+        return systemConfigService.getInt("default_quota", 100);
+    }
+
+    @Override
+    public void setDefaultQuota(int quota) {
+        if (quota < 0 || quota > 100000) {
+            throw new BusinessException(400, "默认值范围必须为 0 ~ 100000");
+        }
+        systemConfigService.set("default_quota", String.valueOf(quota));
     }
 
     @Override

@@ -23,8 +23,6 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final UserApiConfigMapper userApiConfigMapper;
 
-    private static final int DEFAULT_QUOTA = 10;
-
     @Override
     public UserProfileResponse getProfile(Long userId) {
         User user = userMapper.selectById(userId);
@@ -40,7 +38,6 @@ public class UserServiceImpl implements UserService {
                 user.getId(),
                 user.getUsername(),
                 user.getReviewQuota(),
-                DEFAULT_QUOTA,
                 user.getRole(),
                 activeConfig != null ? activeConfig.getApiUrl() : null,
                 activeConfig != null,

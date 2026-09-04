@@ -15,4 +15,6 @@ public interface AdminService {
     void updateUserRole(Long userId, String role);
     void resetUserQuota(Long userId, int quota);
     void deleteUser(Long userId);
+    int getDefaultQuota();
+    void setDefaultQuota(int quota);
 }

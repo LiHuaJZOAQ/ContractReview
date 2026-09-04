@@ -9,7 +9,6 @@ public class UserProfileResponse {
     private Long userId;
     private String username;
     private int reviewQuota;
-    private int quotaTotal;
     private String role;
     private String customApiUrl;
     private boolean hasCustomApiKey;
