@@ -120,11 +120,21 @@ docker compose up -d
 
 ### 3. 配置环境
 
+（1）后端Spring Boot配置
+
 ```bash
 cp src/main/resources/application-example.yml src/main/resources/application-dev.yml
 ```
 
 编辑 `application-dev.yml`，填入你的 LLM API Key 和其他配置。
+
+（2）Docker配置
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`，填入你的 LLM API Key 和其他配置。
 
 ### 4. 运行后端
 
