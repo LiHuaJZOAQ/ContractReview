@@ -191,10 +191,9 @@ async function handleSubmit() {
   try {
     await submitTask(currentTaskId.value)
     submitting.value = false
-    if (auth.reviewQuota > 0) {
-      auth.reviewQuota--
-      localStorage.setItem('reviewQuota', String(auth.reviewQuota))
-    }
+    // 提交成功后由后端扣减配额，前端不应直接修改本地缓存
+    // 而应在提交完成后调用 auth.fetchProfile() 同步真实配额，或在页面可见时刷新
+    await auth.fetchProfile()
     sseRef.value.open()
   } catch (e) {
     submitting.value = false

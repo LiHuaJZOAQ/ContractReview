@@ -93,7 +93,6 @@ class AuthServiceImplTest {
 
         assertNotNull(response);
         assertEquals(1L, response.getUserId());
-        assertEquals(10, response.getReviewQuota());
     }
 
     @Test

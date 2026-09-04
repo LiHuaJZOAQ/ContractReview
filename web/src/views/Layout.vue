@@ -154,7 +154,7 @@ const sidebarCollapsed = ref(false)
 const recordsExpanded = ref(true)
 const recentRecords = ref([])
 const quotaRemaining = computed(() => auth.reviewQuota ?? 0)
-const quotaTotal = computed(() => auth.quotaTotal ?? 10)
+const quotaTotal = computed(() => auth.quotaTotal ?? 0)
 
 const navItems = computed(() => {
   const items = [
@@ -224,6 +224,13 @@ async function fetchRecentRecords() {
 
 onMounted(() => {
   fetchRecentRecords()
+  // 登录后/刷新后统一拉取配额；页面可见时也刷新，确保数据实时
+  auth.fetchProfile()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && auth.isAuthenticated) {
+      auth.fetchProfile()
+    }
+  })
 })
 
 watch(
