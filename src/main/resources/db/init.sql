@@ -148,3 +148,17 @@ CREATE TABLE IF NOT EXISTS `law` (
     CONSTRAINT `fk_law_creator` FOREIGN KEY (`created_by`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='法律法规表';
 
+-- 系统配置表：存储运行时可调的全局配置项（如新用户默认积分），管理员可通过面板修改
+CREATE TABLE IF NOT EXISTS `system_config` (
+    `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
+    `config_value` VARCHAR(500) NOT NULL COMMENT '配置值（字符串）',
+    `description` VARCHAR(255) NULL COMMENT '配置说明',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
+    PRIMARY KEY (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+
+-- 初始化默认积分配置
+INSERT INTO `system_config` (`config_key`, `config_value`, `description`) VALUES
+    ('default_quota', '100', '新用户注册默认积分');
+
