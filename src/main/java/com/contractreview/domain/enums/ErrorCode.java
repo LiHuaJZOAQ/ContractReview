@@ -9,6 +9,7 @@ public enum ErrorCode {
     LLM_API_FAILED(1006, "LLM API 调用失败"),
     INTERNAL_ERROR(1007, "服务器内部错误"),
     RATE_LIMITED(1008, "请求频率超限"),
+    LLM_QUOTA_EXHAUSTED(1010, "AI 模型调用配额已用完，请明日再试或联系管理员充值"),
     TASK_TIMEOUT(1009, "任务执行超时");
 
     private final int code;
@@ -25,7 +26,7 @@ public enum ErrorCode {
     public int getHttpStatus() {
         return switch (this) {
             case TASK_NOT_FOUND -> 404;
-            case QUOTA_INSUFFICIENT, RATE_LIMITED -> 429;
+            case QUOTA_INSUFFICIENT, RATE_LIMITED, LLM_QUOTA_EXHAUSTED -> 429;
             case LLM_API_FAILED, TASK_TIMEOUT -> 502;
             case FORMAT_NOT_SUPPORTED, FILE_SIZE_EXCEEDED, INVALID_STATE -> 400;
             default -> 500;

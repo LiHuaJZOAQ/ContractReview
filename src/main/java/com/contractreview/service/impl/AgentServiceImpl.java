@@ -126,7 +126,10 @@ public class AgentServiceImpl implements AgentService {
         try {
             result = objectMapper.readValue(json, SummarizeResult.class);
         } catch (Exception e) {
-            log.warn("Failed to parse summarize result: {}", e.getMessage());
+            log.warn("Failed to parse summarize result: {} | raw response length: {} | preview: {}",
+                    e.getMessage(),
+                    response != null ? response.length() : 0,
+                    response != null && response.length() > 200 ? response.substring(0, 200) + "..." : response);
             result = new SummarizeResult();
             result.setSummary("");
             result.setRisks(new ArrayList<>());

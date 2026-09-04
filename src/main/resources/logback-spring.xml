@@ -7,12 +7,16 @@
 
     <timestamp key="startTime" datePattern="yyyy-MM-dd-HH-mm-ss"/>
 
+    <!-- 控制台用：消息截断 + 短堆栈（5帧, msg 200字符） -->
     <conversionRule conversionWord="ex" converterClass="com.contractreview.util.ShortThrowableConverter"/>
+
+    <!-- 文件用：完整堆栈，不截断 -->
+    <conversionRule conversionWord="exFull" converterClass="com.contractreview.util.FullThrowableConverter"/>
 
     <appender name="FILE_DEV" class="ch.qos.logback.core.FileAppender">
         <file>${LOG_DIR}/contract-app-dev-${startTime}.log</file>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{2000}).+$', '$1...[truncated by logback]'}%n%ex</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n%exFull</pattern>
         </encoder>
     </appender>
 
@@ -24,7 +28,7 @@
             <totalSizeCap>5GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{2000}).+$', '$1...[truncated by logback]'}%n%ex</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n%exFull</pattern>
         </encoder>
     </appender>
 

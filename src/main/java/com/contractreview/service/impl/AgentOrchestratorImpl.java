@@ -13,7 +13,7 @@ import com.contractreview.service.RagService;
 import com.contractreview.service.ReviewStateMachine;
 import com.contractreview.service.SseService;
 import com.contractreview.util.ChunkingUtil;
-import com.contractreview.util.LogTruncator;
+import com.contractreview.util.LlmErrorClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -99,7 +99,10 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
                             semaphore.release();
                         }
                     } catch (Exception e) {
-                        log.warn("Agent B failed for chunk {}: {}", index, e.getMessage());
+                        log.error("Agent B failed for chunk {} of task {}", index, taskId, e);
+                        if (LlmErrorClassifier.classify(e) != LlmErrorClassifier.Kind.OTHER) {
+                            throw new RuntimeException(e);
+                        }
                         return List.<ScanRiskItem>of();
                     }
                 });
@@ -109,13 +112,10 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             List<ScanRiskItem> allRisks = futures.stream()
                     .flatMap(f -> {
                         try {
-                            List<ScanRiskItem> risks = f.get();
-                            risks.forEach(r -> {
-                                if (r.getClauseIndex() == null) r.setClauseIndex(0);
-                            });
-                            return risks.stream();
+                            return f.get().stream();
                         } catch (Exception e) {
-                            log.warn("Failed to get Agent B result", e);
+                            log.error("Agent B future failed for task {}", taskId, e);
+                            LlmErrorClassifier.rethrowAsBusiness(e);
                             return java.util.stream.Stream.empty();
                         }
                     })
@@ -136,7 +136,10 @@ public class AgentOrchestratorImpl implements AgentOrchestrator {
             return CompletableFuture.completedFuture(report);
 
         } catch (Exception e) {
-            log.error("Review orchestration failed for task {}: {}", taskId, LogTruncator.truncate(e.getMessage(), 200));
+            log.error("Review orchestration failed for task {}", taskId, e);
+            if (LlmErrorClassifier.classify(e) != LlmErrorClassifier.Kind.OTHER) {
+                LlmErrorClassifier.rethrowAsBusiness(e);
+            }
             sseService.sendError(taskId, "审查失败: " + e.getMessage());
             return CompletableFuture.failedFuture(e);
         }
