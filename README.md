@@ -33,14 +33,14 @@ ContractReview 是一款面向 C 端用户的智能合同风险审查工具。�
 
 ## 功能特性
 
-- **合同解析** — 基于 Apache PDFBox 提取合同文本，支持 PDF 格式
+- **合同解析** — 基于 Apache PDFBox（PDF）和 Apache POI（DOCX）提取合同文本
 - **隐私脱敏** — 自动识别并替换姓名、身份证号、手机号、银行卡号（支持 `?desensitize=false` 跳过脱敏）
-- **RAG 法条检索** — 内置民法典、劳动法、合同法知识库，向量相似度检索增强审查依据
+- **RAG 法条检索** — 内置民法典、劳动合同法、知识产权相关法律知识库，向量相似度检索增强审查依据
 - **Multi-Agent 审查管线** — Agent A 合同分类、Agent B 分块审查（Semaphore 10 路并发）、Agent C 汇总报告
 - **异步状态机** — RabbitMQ + DLX 死信队列驱动，SSE 实时推送进度和中间结果
 - **结构化风险报告** — 高危/中危/低危分级，关联法条引用
 - **JWT 鉴权 + Token 刷新** — Spring Security 完整鉴权链，自动续期，并发安全
-- **Redis 限流 + 配额管理** — 滑动窗口限流，Lua 原子配额扣减，失败自动回滚
+- **Redis 限流 + 积分管理** — 滑动窗口限流，Lua 原子积分扣减，失败自动回滚
 - **操作审计** — AOP 注解记录用户操作日志
 - **任务重试** — 失败任务支持一键重试
 - **Vue 3 前端** — 用户注册登录、文件上传、进度展示、报告查看、历史筛选
@@ -55,7 +55,7 @@ ContractReview 是一款面向 C 端用户的智能合同风险审查工具。�
 | 向量库 | Chroma |
 | 存储 | MySQL 8.0, Redis, MinIO |
 | 安全 | JJWT 0.12, BCrypt, Lua 限流脚本 |
-| 解析 | Apache PDFBox 3.0 |
+| 解析 | Apache PDFBox 3.0, Apache POI (DOCX) |
 | 前端 | Vue 3.4, Pinia, Vue Router, Element Plus, Axios |
 | 构建 | Maven, Vite |
 | 测试 | JUnit 5, Mockito, Vitest, @vue/test-utils, happy-dom |
@@ -65,7 +65,7 @@ ContractReview 是一款面向 C 端用户的智能合同风险审查工具。�
 ```
 src/main/java/com/contractreview/
 ├── config/               # 多环境配置、Security、Redis、RabbitMQ
-├── controller/           # AuthController, ContractController
+├── controller/           # Auth / Contract / User / Law / Admin Controller
 ├── service/
 │   ├── AuthService
 │   ├── ContractService
@@ -73,7 +73,7 @@ src/main/java/com/contractreview/
 │   ├── RagService
 │   ├── SseService
 │   ├── ReviewStateMachine
-│   └── impl/             # 各接口实现（含 MQ 监听器）
+│   └── impl/             # 各接口实现（含 RabbitMQ 监听器 ReviewMessageListenerImpl）
 ├── mapper/               # MyBatis-Plus Mapper 接口
 ├── domain/
 │   ├── entity/           # 数据表实体
@@ -83,14 +83,13 @@ src/main/java/com/contractreview/
 ├── exception/            # 全局异常处理器
 ├── security/             # JWT 工具类、过滤器、限流过滤器
 ├── aop/                  # @AuditLog 操作审计
-├── async/                # 异步配额回滚处理器
 └── util/                 # 脱敏工具、文件工具、文本分块工具
 
 web/                      # Vue 3 前端
 ├── src/
 │   ├── api/              # Axios 封装 + API 函数
-│   ├── components/       # SseProgress 等通用组件
-│   ├── views/            # Login, Upload, Report, History
+│   ├── components/       # SseProgress, ThemeToggle
+│   ├── views/            # Login, Register, Upload, Report, History, Profile, LawLibrary, AdminDashboard, Monitor, Forbidden, NotFound
 │   ├── stores/           # Pinia 状态管理
 │   └── router/           # Vue Router 路由 + 导航守卫
 └── vitest.config.js
@@ -155,14 +154,14 @@ npm install
 # 开发模式
 npm run dev
 
-# 构建
+# 构建（生产）
 # npm run build
 
 # 运行测试
 # npm test
 ```
 
-开发环境下默认访问 `http://localhost:5173`。
+开发环境下前端默认访问 `http://localhost:5173`。
 
 ### CURL验证
 
@@ -187,32 +186,46 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/auth/register` | 用户注册 |
-| POST | `/auth/login` | 用户登录 |
-| POST | `/auth/refresh` | 刷新 Token |
+| POST | `/auth/login` | 用户登录（返回 token / refreshToken）|
+| POST | `/auth/refresh` | 刷新 Token（返回新 token，仅更新认证状态）|
 | POST | `/contract/upload` | 上传合同（`?desensitize=false` 跳过脱敏） |
-| POST | `/contract/{taskId}/submit` | 确认提交审查 |
+| POST | `/contract/paste` | 直接粘贴合同文本审查 |
+| POST | `/contract/{taskId}/submit` | 确认提交审查（扣积分）|
 | GET | `/contract/{taskId}/status` | 查询任务状态 |
 | GET | `/contract/{taskId}/report` | 获取审查报告 |
 | GET | `/contract/{taskId}/progress` | SSE 实时进度推送 |
 | GET | `/contract/{taskId}/text` | 获取合同预览原文 |
 | GET | `/contract/{taskId}/logs` | 获取审查过程日志 |
 | GET | `/contract/history` | 历史记录（分页，`?status=` 筛选） |
-| GET | `/contract/history/{status}` | 按状态筛选历史 |
 | POST | `/contract/{taskId}/retry` | 重试失败任务 |
+| GET | `/user/profile` | 获取个人资料、积分和API 配置 |
+| PUT | `/user/profile` | 更新用户名 |
+| POST | `/user/password` | 修改密码 |
+| PUT | `/user/api-config` | 设置自定义 LLM API |
+| GET/POST/PUT/DELETE | `/law/**` | 法条库 CRUD 与重索引（需 ADMIN）|
+| GET | `/admin/stats` | 系统统计（ADMIN）|
+| GET | `/admin/monitor` | 系统监控指标（ADMIN）|
+| GET | `/admin/operations` | 操作日志（ADMIN）|
+| GET | `/admin/users` | 用户列表（ADMIN）|
+| PUT | `/admin/users/{id}/role` | 修改用户角色（ADMIN）|
+| PUT | `/admin/users/{id}/quota` | 设置用户积分（ADMIN）|
+| GET | `/admin/quota-default` | 查询新用户默认积分（ADMIN）|
+| PUT | `/admin/quota-default` | 设置新用户默认积分（ADMIN，0 ~ 100000）|
+| DELETE | `/admin/users/{id}` | 删除用户（ADMIN）|
 
 **统一响应格式**：
 
 ```json
 {
-  "code": 200,
+  "code": 0,
   "message": "success",
   "data": {},
-  "timestamp": 1717200000000,
+  "timestamp": "2026-09-04T12:00:00Z",
   "requestId": "uuid"
 }
 ```
 
-**错误码**：1001（格式不支持）、1002（文件过大）、1003（配额不足）、1004（任务不存在）、1005（状态非法）、1006（LLM 失败）、1008（限流）、1009（超时）。
+**错误码**：1001（格式不支持）、1002（文件过大）、1003（积分不足）、1004（任务不存在）、1005（状态非法）、1006（LLM 失败）、1008（限流）、1009（超时）。
 
 ## 测试
 
@@ -227,19 +240,28 @@ mvn test -Dtest=DesensitizationUtilTest
 cd web && npm test
 ```
 
-当前共 **11 个测试类**，覆盖：
+当前共 **18 个测试类**，覆盖：
 
 | 测试类 | 用例数 | 范围 |
 |--------|--------|------|
-| DesensitizationUtilTest | 17 | 脱敏正则边界场景 |
+| DesensitizationUtilTest | 6 | 脱敏正则边界场景 |
 | JwtUtilsTest | 5 | Token 签发/验证/篡改 |
 | AuthServiceImplTest | 7 | 注册/登录/刷新 |
-| ContractServiceImplTest | 23 | 上传/提交/状态/报告/历史/重试/异步审查 |
-| AgentServiceImplTest | 9 | Agent A/B/C 解析与兜底 |
-| RagServiceImplTest | 8 | 向量库查询与降级 |
-| ReviewMessageListenerTest | 12 | MQ 消息消费、DLX 重试、状态转换 |
-| ReviewStateMachineImplTest | 8 | 状态有效性、重复转换、超时转换 |
-| SseServiceImplTest | 5 | SSE 发射、Agent 注册、完成与错误事件 |
+| ContractServiceImplTest | 20 | 上传/提交/状态/报告/历史/重试/异步审查 |
+| AgentServiceImplTest | 10 | Agent A/B/C 解析与兜底 |
+| RagServiceImplTest | 7 | 向量库查询与降级 |
+| ReviewMessageListenerTest | 7 | MQ 消息消费、DLX 重试、状态转换 |
+| ReviewStateMachineImplTest | 6 | 状态有效性、重复转换、超时转换 |
+| SseServiceImplTest | 8 | SSE 发射、Agent 注册、完成与错误事件 |
+| ReviewResultHandlerTest | — | 审查结果落库与异常处理 |
+| UserContextTest | — | 用户上下文工具 |
+| JwtAuthenticationFilterTest | — | 鉴权过滤器 |
+| GlobalExceptionHandlerTest | — | 全局异常处理 |
+| AccessLogFilterTest | — | 访问日志过滤器 |
+| MdcFilterTest | — | MDC 请求 ID 过滤器 |
+| LogTruncatorTest | — | 日志截断防 HTML 污染 |
+| ErrorCodeTest | — | 错误码枚举 |
+| AuthRequestValidationTest | — | 请求参数校验 |
 | 前端测试 10 文件 | 66 | API / Store / Router / Components / Views |
 
 ## 开发路线
