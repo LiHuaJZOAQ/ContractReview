@@ -14,6 +14,7 @@
             placeholder="用户名"
             size="large"
             :prefix-icon="User"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
         <el-form-item prop="password">
@@ -24,6 +25,7 @@
             size="large"
             :prefix-icon="Lock"
             show-password
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
         <el-button
