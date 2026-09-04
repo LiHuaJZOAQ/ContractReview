@@ -62,6 +62,18 @@
     </div>
 
     <div class="admin-section">
+      <div class="section-header default-quota-header">
+        <div class="default-quota-row">
+          <div>
+            <h3 class="section-title">新用户默认积分</h3>
+            <p class="section-desc">当前值：<strong>{{ defaultQuota }}</strong> 积分。修改后，新注册用户立即生效。</p>
+          </div>
+          <button class="action-btn" @click="handleSetDefaultQuota">修改默认值</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
       <div class="section-header">
         <h3 class="section-title">用户管理</h3>
       </div>
@@ -86,13 +98,13 @@
                   {{ user.role === 'ADMIN' ? '管理员' : '用户' }}
                 </span>
               </td>
-              <td>{{ user.reviewQuota }}</td>
+              <td>{{ user.reviewQuota }}<span class="unit"> 积分</span></td>
               <td>{{ user.createdAt || '-' }}</td>
               <td class="td-actions">
                 <button class="action-btn" @click="handleToggleRole(user)">
                   {{ user.role === 'ADMIN' ? '设为用户' : '设为管理员' }}
                 </button>
-                <button class="action-btn" @click="handleResetQuota(user)">重置额度</button>
+                <button class="action-btn" @click="handleResetQuota(user)">设置积分</button>
                 <button class="action-btn action-danger" @click="handleDeleteUser(user)">删除</button>
               </td>
             </tr>
@@ -106,13 +118,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSystemStats, getAdminUsers, updateUserRole, resetUserQuota, deleteUser } from '@/api/admin'
+import { getSystemStats, getAdminUsers, updateUserRole, resetUserQuota, deleteUser, getDefaultQuota, setDefaultQuota } from '@/api/admin'
 
 const stats = ref({
   totalUsers: 0, totalTasks: 0, successTasks: 0,
   failedTasks: 0, processingTasks: 0, totalLaws: 0
 })
 const users = ref([])
+const defaultQuota = ref(100)
 
 async function fetchStats() {
   try {
@@ -123,6 +136,29 @@ async function fetchStats() {
 async function fetchUsers() {
   try {
     users.value = await getAdminUsers()
+  } catch {}
+}
+
+async function fetchDefaultQuota() {
+  try {
+    const res = await getDefaultQuota()
+    defaultQuota.value = res.quota ?? 100
+  } catch {}
+}
+
+async function handleSetDefaultQuota() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新用户默认积分（0 ~ 100000）', '设置默认积分', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      inputPattern: /^\d+$/,
+      inputErrorMessage: '请输入非负整数',
+      inputValue: String(defaultQuota.value)
+    })
+    const q = parseInt(value, 10)
+    await setDefaultQuota(q)
+    defaultQuota.value = q
+    ElMessage.success(`默认积分已设为 ${q}，新注册用户生效`)
   } catch {}
 }
 
@@ -172,6 +208,7 @@ async function handleDeleteUser(user) {
 onMounted(() => {
   fetchStats()
   fetchUsers()
+  fetchDefaultQuota()
 })
 </script>
 
@@ -254,6 +291,26 @@ onMounted(() => {
   font-weight: 600;
   color: var(--color-text-primary);
   margin: 0;
+}
+
+.default-quota-header {
+  background: var(--color-accent-light);
+}
+.default-quota-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.section-desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin: 4px 0 0 0;
+}
+.unit {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-xs);
+  margin-left: 4px;
 }
 
 .table-wrapper {

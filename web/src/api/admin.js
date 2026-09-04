@@ -26,6 +26,14 @@ export function resetUserQuota(userId, quota) {
   return axios.put(`/admin/users/${userId}/quota`, { quota })
 }
 
+export function getDefaultQuota() {
+  return axios.get('/admin/quota-default')
+}
+
+export function setDefaultQuota(quota) {
+  return axios.put('/admin/quota-default', { quota })
+}
+
 export function deleteUser(userId) {
   return axios.delete(`/admin/users/${userId}`)
 }

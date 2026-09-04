@@ -10,14 +10,13 @@ export const useAuthStore = defineStore('auth', () => {
   const username = ref(localStorage.getItem('username') || '')
   const role = ref(localStorage.getItem('role') || 'USER')
 
-  // 配额统一从 /user/profile 获取，不存储在登录响应中
+  // 积分统一从 /user/profile 获取，不存储在登录响应中
   const reviewQuota = ref(parseInt(localStorage.getItem('reviewQuota'), 10) || 0)
-  const quotaTotal = ref(parseInt(localStorage.getItem('quotaTotal'), 10) || 0)
 
   const isAuthenticated = computed(() => !!token.value)
 
   /**
-   * 登录成功后调用：保存 Token + 拉取配额
+   * 登录成功后调用：保存 Token + 拉取积分
    */
   async function login(credentials) {
     const res = await apiLogin(credentials)
@@ -27,7 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 注册成功后调用：保存 Token + 拉取配额
+   * 注册成功后调用：保存 Token + 拉取积分
    */
   async function register(data) {
     const res = await apiRegister(data)
@@ -56,18 +55,16 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = ''
     role.value = 'USER'
     reviewQuota.value = 0
-    quotaTotal.value = 0
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userId')
     localStorage.removeItem('username')
     localStorage.removeItem('role')
     localStorage.removeItem('reviewQuota')
-    localStorage.removeItem('quotaTotal')
   }
 
   /**
-   * Token 刷新：仅更新 Token，配额不从此获取
+   * Token 刷新：仅更新 Token，积分不从此获取
    */
   async function refresh() {
     const res = await apiRefresh(refreshTokenValue.value)
@@ -76,10 +73,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 统一从 /user/profile 拉取配额（以及用户名等个人资料）
+   * 统一从 /user/profile 拉取积分（以及用户名等个人资料）
    * 建议在以下时机调用：
    *   - 登录/注册成功后
-   *   - Token 刷新成功后（非必须，配额不常变）
+   *   - Token 刷新成功后（非必须，积分不常变）
    *   - 页面可见性恢复时（见 Layout.vue visibilitychange）
    */
   async function fetchProfile() {
@@ -88,9 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = res.data?.data
       if (data) {
         reviewQuota.value = data.reviewQuota ?? 0
-        quotaTotal.value = data.quotaTotal ?? 0
         localStorage.setItem('reviewQuota', String(reviewQuota.value))
-        localStorage.setItem('quotaTotal', String(quotaTotal.value))
         // 用户名可能已在别处修改，同步一下
         if (data.username) {
           username.value = data.username
@@ -98,14 +93,14 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
     } catch (e) {
-      // 配额获取失败不影响主流程，保留上一次的缓存值
-      console.warn('获取用户配额失败，使用缓存值', e)
+      // 积分获取失败不影响主流程，保留上一次的缓存值
+      console.warn('获取用户积分失败，使用缓存值', e)
     }
   }
 
   return {
     token, refreshTokenValue, userId, username, role,
-    reviewQuota, quotaTotal,
+    reviewQuota,
     isAuthenticated,
     login, register, logout, refresh, fetchProfile
   }

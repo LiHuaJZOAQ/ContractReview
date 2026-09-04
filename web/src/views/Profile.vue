@@ -41,8 +41,8 @@
               </span>
             </div>
             <div class="info-row">
-              <span class="info-label">剩余额度</span>
-              <span class="info-value quota-value">{{ profile.reviewQuota }}/{{ profile.quotaTotal }} 次</span>
+              <span class="info-label">积分</span>
+              <span class="info-value quota-value">{{ profile.reviewQuota }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">注册时间</span>
