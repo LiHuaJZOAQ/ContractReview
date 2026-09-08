@@ -17,6 +17,11 @@ public class DesensitizationUtil {
     private static final Pattern BANK_CARD = Pattern.compile(
             "(?<=账号|卡号|户名)[：:\\s]*\\d{16,19}");
 
+    private static final Pattern CLAUSE_HEADING = Pattern.compile(
+            "[\\s\\S]*?第[零一二三四五六七八九十百千0-9]+条");
+
+    private static final int HEADER_FALLBACK_CHARS = 500;
+
     public static String desensitize(String text) {
         if (text == null || text.isEmpty()) {
             return text;
@@ -29,5 +34,25 @@ public class DesensitizationUtil {
         result = PHONE.matcher(result).replaceAll("***");
         result = BANK_CARD.matcher(result).replaceAll(m -> m.group().replaceAll("\\d{16,19}", "***"));
         return result;
+    }
+
+    public static int findHeaderEndIndex(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        var matcher = CLAUSE_HEADING.matcher(text);
+        if (matcher.find()) {
+            return matcher.end();
+        }
+        return Math.min(HEADER_FALLBACK_CHARS, text.length());
+    }
+
+    public static String desensitizeHeader(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        int headerEnd = findHeaderEndIndex(text);
+        String header = desensitize(text.substring(0, headerEnd));
+        return header + text.substring(headerEnd);
     }
 }

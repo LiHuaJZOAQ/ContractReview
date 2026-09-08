@@ -77,7 +77,7 @@ public class ContractServiceImpl implements ContractService {
     public UploadResponse upload(MultipartFile file, Long userId, boolean desensitize) {
         fileUtil.validateFile(file);
         String rawText = fileUtil.extractText(file);
-        String processedText = desensitize ? DesensitizationUtil.desensitize(rawText) : rawText;
+        String processedText = desensitize ? DesensitizationUtil.desensitizeHeader(rawText) : rawText;
 
         String fileUrl = uploadToMinio(file, userId);
 
@@ -86,6 +86,7 @@ public class ContractServiceImpl implements ContractService {
         task.setFileName(file.getOriginalFilename());
         task.setFileSize(file.getSize());
         task.setPreviewText(processedText);
+        task.setRawText(rawText);
         task.setFileUrl(fileUrl);
         task.setStatus(TaskStatus.PENDING.name());
         task.setProgress(0);
@@ -100,13 +101,14 @@ public class ContractServiceImpl implements ContractService {
         if (text == null || text.trim().isEmpty()) {
             throw new BusinessException(400, "合同文本不能为空");
         }
-        String processedText = desensitize ? DesensitizationUtil.desensitize(text) : text;
+        String processedText = desensitize ? DesensitizationUtil.desensitizeHeader(text) : text;
 
         ReviewTask task = new ReviewTask();
         task.setUserId(userId);
         task.setFileName("粘贴文本_" + System.currentTimeMillis() + ".txt");
         task.setFileSize((long) text.getBytes().length);
         task.setPreviewText(processedText);
+        task.setRawText(text);
         task.setFileUrl(null);
         task.setStatus(TaskStatus.PENDING.name());
         task.setProgress(0);
@@ -245,6 +247,24 @@ public class ContractServiceImpl implements ContractService {
             throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
         }
         return task.getPreviewText();
+    }
+
+    @Override
+    @Transactional
+    public void updatePreviewText(Long taskId, Long userId, String newText) {
+        if (newText == null || newText.length() > 200_000) {
+            throw new BusinessException(400, "预览文本不能超过 200000 字符");
+        }
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        String status = task.getStatus();
+        if (!TaskStatus.PENDING.name().equals(status) && !TaskStatus.PARSING.name().equals(status)) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "仅待处理或解析中状态可修改预览");
+        }
+        task.setPreviewText(newText);
+        taskMapper.updateById(task);
     }
 
     @Override

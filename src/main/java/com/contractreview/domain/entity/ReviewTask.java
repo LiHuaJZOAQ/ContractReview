@@ -16,6 +16,10 @@ public class ReviewTask {
     private Long fileSize;
 
     private String previewText;
+
+    // @TableField("raw_text")      //可加可不加
+    private String rawText;
+
     private String fileUrl;
 
     private String contractType;

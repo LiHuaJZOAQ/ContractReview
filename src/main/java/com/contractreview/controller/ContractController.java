@@ -131,6 +131,16 @@ public class ContractController {
         return R.ok(text);
     }
 
+    @PutMapping("/{taskId}/preview")
+    @AuditLog(action = "UPDATE_PREVIEW")
+    @Operation(summary = "更新合同预览文本", description = "用户编辑脱敏后的预览文本后保存。仅 PENDING/PARSING 状态可修改。")
+    public R<Void> updatePreviewText(@PathVariable Long taskId,
+                                     @Valid @RequestBody UpdatePreviewRequest request) {
+        Long userId = UserContext.getUserId();
+        contractService.updatePreviewText(taskId, userId, request.getText());
+        return R.ok();
+    }
+
     @GetMapping("/{taskId}/logs")
     @Operation(summary = "获取审查过程日志", description = "返回每个 Agent 的执行过程日志")
     public R<List<ContractService.ReviewProcessLogDto>> getProcessLogs(@PathVariable Long taskId) {

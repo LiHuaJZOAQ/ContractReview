@@ -16,6 +16,7 @@ public interface ContractService {
     HistoryResponse getHistory(Long userId, int page, int size, String status);
     void retry(Long taskId, Long userId);
     String getPreviewText(Long taskId, Long userId);
+    void updatePreviewText(Long taskId, Long userId, String newText);
     List<ReviewProcessLogDto> getProcessLogs(Long taskId, Long userId);
 
     @Data
