@@ -17,6 +17,10 @@ export function submitTask(taskId) {
   return axios.post(`/contract/${taskId}/submit`)
 }
 
+export function updatePreview(taskId, text) {
+  return axios.put(`/contract/${taskId}/preview`, { text })
+}
+
 export function getStatus(taskId) {
   return axios.get(`/contract/${taskId}/status`)
 }

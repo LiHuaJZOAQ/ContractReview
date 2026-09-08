@@ -88,11 +88,30 @@
 
       <transition name="card-slide-up" mode="out-in">
         <div v-if="previewText" key="preview" class="preview-section">
-        <div class="section-label">文本预览</div>
+        <div class="section-label">文本预览（可编辑）</div>
         <div class="preview-block">
-          <pre class="preview-text">{{ previewText }}</pre>
+          <div class="find-bar">
+            <el-input v-model="findKw" placeholder="查找" size="small" class="find-input" @keyup.enter="findNext" />
+            <el-input v-model="replaceKw" placeholder="替换为" size="small" class="find-input" />
+            <span class="hit-count">{{ hits.length ? hitIdx + 1 : 0 }}/{{ hits.length }}</span>
+            <el-button size="small" :disabled="!hits.length" @click="findPrev">上一处</el-button>
+            <el-button size="small" :disabled="!hits.length" @click="findNext">下一处</el-button>
+            <el-button size="small" :disabled="!hits.length" @click="replaceOne">替换</el-button>
+            <el-button size="small" type="primary" :disabled="!hits.length" @click="replaceAll">全部替换</el-button>
+          </div>
+          <el-input
+            v-model="editablePreview"
+            type="textarea"
+            :rows="14"
+            class="preview-textarea"
+            placeholder="脱敏预览文本，可编辑后保存"
+          />
         </div>
         <div class="action-row">
+          <button class="btn btn-secondary" :disabled="saving || !editablePreview.trim()" @click="savePreview">
+            <span v-if="saving" class="spinner" />
+            {{ saving ? '保存中...' : '保存预览' }}
+          </button>
           <button class="btn btn-secondary" @click="handleBack">返回</button>
           <button class="btn btn-primary" :disabled="submitting" @click="handleSubmit">
             <span v-if="submitting" class="spinner" />
@@ -108,10 +127,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { uploadFile, pasteText, submitTask } from '@/api/contract'
+import { uploadFile, pasteText, submitTask, updatePreview } from '@/api/contract'
 import { useAuthStore } from '@/stores/auth'
 import SseProgress from '@/components/SseProgress.vue'
 
@@ -120,13 +139,70 @@ const auth = useAuthStore()
 const sseRef = ref(null)
 const desensitize = ref(true)
 const previewText = ref('')
+const editablePreview = ref('')
 const currentTaskId = ref(null)
 const selectedFile = ref(null)
 const uploading = ref(false)
 const submitting = ref(false)
+const saving = ref(false)
 const dragover = ref(false)
 const mode = ref('file')
 const pastedText = ref('')
+
+// 查找替换状态
+const findKw = ref('')
+const replaceKw = ref('')
+const hits = ref([])
+const hitIdx = ref(0)
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function recomputeHits() {
+  if (!findKw.value) {
+    hits.value = []
+    hitIdx.value = 0
+    return
+  }
+  const re = new RegExp(escapeRegExp(findKw.value), 'g')
+  const list = []
+  let m
+  while ((m = re.exec(editablePreview.value)) !== null) {
+    list.push(m.index)
+    if (m.index === re.lastIndex) re.lastIndex++
+  }
+  hits.value = list
+  hitIdx.value = list.length ? 0 : -1
+}
+
+function findNext() {
+  if (!hits.value.length) return
+  hitIdx.value = (hitIdx.value + 1) % hits.value.length
+}
+
+function findPrev() {
+  if (!hits.value.length) return
+  hitIdx.value = (hitIdx.value - 1 + hits.value.length) % hits.value.length
+}
+
+function replaceOne() {
+  if (!hits.value.length) return
+  const i = hits.value[hitIdx.value]
+  editablePreview.value =
+    editablePreview.value.slice(0, i) + replaceKw.value +
+    editablePreview.value.slice(i + findKw.value.length)
+  recomputeHits()
+}
+
+function replaceAll() {
+  if (!findKw.value) return
+  const re = new RegExp(escapeRegExp(findKw.value), 'g')
+  editablePreview.value = editablePreview.value.replace(re, replaceKw.value)
+  recomputeHits()
+}
+
+watch([findKw, editablePreview], recomputeHits)
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -163,6 +239,7 @@ async function handleUpload() {
   try {
     const res = await uploadFile(selectedFile.value, desensitize.value)
     previewText.value = res.previewText
+    editablePreview.value = res.previewText
     currentTaskId.value = res.taskId
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '上传失败')
@@ -177,6 +254,7 @@ async function handlePaste() {
   try {
     const res = await pasteText(pastedText.value, desensitize.value)
     previewText.value = res.previewText
+    editablePreview.value = res.previewText
     currentTaskId.value = res.taskId
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '处理失败')
@@ -201,10 +279,29 @@ async function handleSubmit() {
   }
 }
 
+async function savePreview() {
+  if (!currentTaskId.value) return
+  saving.value = true
+  try {
+    await updatePreview(currentTaskId.value, editablePreview.value)
+    previewText.value = editablePreview.value
+    ElMessage.success('预览已保存')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
 function handleBack() {
   previewText.value = ''
+  editablePreview.value = ''
   currentTaskId.value = null
   pastedText.value = ''
+  findKw.value = ''
+  replaceKw.value = ''
+  hits.value = []
+  hitIdx.value = 0
 }
 
 function onComplete() {
@@ -508,18 +605,48 @@ function onError(msg) {
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-md);
   padding: var(--space-4);
-  max-height: 320px;
+  max-height: 480px;
   overflow-y: auto;
 }
 
-.preview-text {
+.preview-textarea {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
+}
+
+.preview-textarea :deep(textarea) {
+  background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
+}
+
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.find-input {
+  width: 140px;
+}
+
+.find-input :deep(input) {
+  font-size: var(--text-xs);
+  padding: 4px 8px;
+}
+
+.hit-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  min-width: 48px;
+  text-align: center;
+}
+
+.find-bar .el-button {
+  font-size: var(--text-xs);
+  padding: 4px 10px;
 }
 
 .action-row {
