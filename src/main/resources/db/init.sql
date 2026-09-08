@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS `review_task` (
     `file_name` VARCHAR(255) NOT NULL COMMENT '上传的合同文件名',
     `file_size` BIGINT NOT NULL COMMENT '文件大小（字节）',
     `preview_text` MEDIUMTEXT NULL COMMENT '合同文本预览内容（前N字符）',
+    `raw_text` MEDIUMTEXT NULL COMMENT '合同原文（未脱敏），用于备份与重生成',
     `file_url` VARCHAR(1024) NULL COMMENT '文件存储路径或对象存储URL',
     `contract_type` VARCHAR(50) NULL COMMENT '合同类型，如：劳动合同、采购合同',
     `user_stance` VARCHAR(50) NULL COMMENT '用户立场，如：甲方 / 乙方',
@@ -62,6 +63,10 @@ CREATE TABLE IF NOT EXISTS `review_task` (
     KEY `idx_user_status_created` (`user_id`, `status`, `created_at`) COMMENT '用户+状态+时间联合索引，用于列表查询',
     CONSTRAINT `fk_task_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审查任务表';
+
+-- 已运行 DB 迁移：新增 raw_text 列（NULLABLE，无需默认值）
+ALTER TABLE `review_task`
+    ADD COLUMN IF NOT EXISTS `raw_text` MEDIUMTEXT NULL COMMENT '合同原文（未脱敏），用于备份与重生成' AFTER `preview_text`;
 
 -- 风险项表：存储每个审查任务识别出的合同风险条款详情
 CREATE TABLE IF NOT EXISTS `risk_item` (
