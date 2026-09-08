@@ -46,7 +46,7 @@ public class SpringAiConfig {
                 } catch (Exception e) {
                     log.error("LLM API connection test failed: {} (url={})", LogTruncator.truncate(e.getMessage(), 200), baseUrl);
                     log.error("Please verify LLM_API_BASE_URL and LLM_API_KEY environment variables");
-                    log.error("请检查LLM_API_BASE_URL是否以v1结尾，正确写法不带v1后缀");
+                    log.error("[提示]请检查LLM_API_BASE_URL是否以v1结尾，正确写法不带v1后缀");
                 }
             }
         };
