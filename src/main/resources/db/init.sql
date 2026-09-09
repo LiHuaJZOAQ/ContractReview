@@ -64,10 +64,6 @@ CREATE TABLE IF NOT EXISTS `review_task` (
     CONSTRAINT `fk_task_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审查任务表';
 
--- 已运行 DB 迁移：新增 raw_text 列（NULLABLE，无需默认值）
-ALTER TABLE `review_task`
-    ADD COLUMN IF NOT EXISTS `raw_text` MEDIUMTEXT NULL COMMENT '合同原文（未脱敏），用于备份与重生成' AFTER `preview_text`;
-
 -- 风险项表：存储每个审查任务识别出的合同风险条款详情
 CREATE TABLE IF NOT EXISTS `risk_item` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '风险项主键ID',
