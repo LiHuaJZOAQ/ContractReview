@@ -19,6 +19,8 @@ public class User {
     @TableField("review_quota")
     private Integer reviewQuota;
 
+    private String role;
+
     @Version
     private Integer version;
 
@@ -27,4 +29,7 @@ public class User {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @TableLogic
+    private Integer deleted;
 }

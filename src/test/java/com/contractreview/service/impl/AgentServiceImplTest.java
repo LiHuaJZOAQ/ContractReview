@@ -1,7 +1,9 @@
 package com.contractreview.service.impl;
 
+import com.contractreview.domain.dto.ClassifyResult;
+import com.contractreview.domain.dto.ScanRiskItem;
+import com.contractreview.domain.dto.SummarizeResult;
 import com.contractreview.service.AgentService;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,8 +13,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -46,10 +48,10 @@ class AgentServiceImplTest {
         String json = "{\"contractType\": \"租赁\", \"userStance\": \"承租方\", \"reviewStrategy\": \"重点审查租金和违约责任\"}";
         mockLLMResponse(json);
 
-        Map<String, String> result = agentService.classifyContract("甲方将房屋出租给乙方...");
+        ClassifyResult result = agentService.classifyContract("甲方将房屋出租给乙方...");
 
-        assertEquals("租赁", result.get("contractType"));
-        assertEquals("承租方", result.get("userStance"));
+        assertEquals("租赁", result.getContractType());
+        assertEquals("承租方", result.getUserStance());
     }
 
     @Test
@@ -64,19 +66,20 @@ class AgentServiceImplTest {
         when(callSpec.content()).thenReturn(json);
 
         String longText = "a".repeat(5000);
-        Map<String, String> result = agentService.classifyContract(longText);
+        ClassifyResult result = agentService.classifyContract(longText);
 
-        assertEquals("劳动", result.get("contractType"));
+        assertEquals("劳动", result.getContractType());
     }
 
     @Test
-    @DisplayName("Agent A: LLM 返回非 JSON 时返回空 Map")
+    @DisplayName("Agent A: LLM 返回非 JSON 时返回默认值")
     void testClassifyInvalidResponse() {
         mockLLMResponse("抱歉，我无法分析这份合同");
 
-        Map<String, String> result = agentService.classifyContract("test");
+        ClassifyResult result = agentService.classifyContract("test");
 
-        assertTrue(result.isEmpty());
+        assertEquals("其他", result.getContractType());
+        assertEquals("其他", result.getUserStance());
     }
 
     @Test
@@ -85,12 +88,12 @@ class AgentServiceImplTest {
         String json = "[{\"clauseIndex\": 5, \"clauseContent\": \"甲方不承担任何责任\", \"riskLevel\": \"HIGH\", \"riskType\": \"免责\", \"description\": \"不合理免责\", \"suggestion\": \"删除此条款\", \"relatedLaws\": [\"民法典第506条\"]}]";
         mockLLMResponse(json);
 
-        List<Map<String, Object>> result = agentService.scanRisks("甲方不承担任何责任",
+        List<ScanRiskItem> result = agentService.scanRisks("甲方不承担任何责任",
                 List.of("民法典第506条"), "重点审查免责条款");
 
         assertEquals(1, result.size());
-        assertEquals("HIGH", result.get(0).get("riskLevel"));
-        assertEquals("免责", result.get(0).get("riskType"));
+        assertEquals("HIGH", result.get(0).getRiskLevel());
+        assertEquals("免责", result.get(0).getRiskType());
     }
 
     @Test
@@ -104,7 +107,7 @@ class AgentServiceImplTest {
         when(request.call()).thenReturn(callSpec);
         when(callSpec.content()).thenReturn(json);
 
-        List<Map<String, Object>> result = agentService.scanRisks("test", List.of(), "标准审查");
+        List<ScanRiskItem> result = agentService.scanRisks("test", List.of(), "标准审查");
 
         assertTrue(result.isEmpty());
     }
@@ -114,7 +117,7 @@ class AgentServiceImplTest {
     void testScanRisksInvalidResponse() {
         mockLLMResponse("没有风险");
 
-        List<Map<String, Object>> result = agentService.scanRisks("test", List.of(), "标准审查");
+        List<ScanRiskItem> result = agentService.scanRisks("test", List.of(), "标准审查");
 
         assertTrue(result.isEmpty());
     }
@@ -125,15 +128,14 @@ class AgentServiceImplTest {
         String json = "{\"summary\": \"本合同存在 2 项风险\", \"riskCount\": {\"high\": 1, \"medium\": 1, \"low\": 0}, \"risks\": []}";
         mockLLMResponse(json);
 
-        List<Map<String, Object>> risks = List.of(
-                Map.of("clauseIndex", 1, "riskLevel", "HIGH", "description", "风险1"),
-                Map.of("clauseIndex", 2, "riskLevel", "MEDIUM", "description", "风险2")
+        List<ScanRiskItem> risks = List.of(
+                buildRiskItem(1, "HIGH"), buildRiskItem(2, "MEDIUM")
         );
-        Map<String, Object> result = agentService.summarizeReport(risks, "租赁");
+        SummarizeResult result = agentService.summarizeReport(risks, "租赁");
 
-        assertEquals("本合同存在 2 项风险", result.get("summary"));
-        assertEquals(1, ((Map<String, Integer>) result.get("riskCount")).get("high").intValue());
-        assertEquals(1, ((Map<String, Integer>) result.get("riskCount")).get("medium").intValue());
+        assertEquals("本合同存在 2 项风险", result.getSummary());
+        assertEquals(1, result.getRiskCount().get("high").intValue());
+        assertEquals(1, result.getRiskCount().get("medium").intValue());
     }
 
     @Test
@@ -142,12 +144,12 @@ class AgentServiceImplTest {
         String json = "{\"summary\": \"无风险\"}";
         mockLLMResponse(json);
 
-        List<Map<String, Object>> risks = List.of(Map.of("clauseIndex", 1, "riskLevel", "LOW", "description", "小问题"));
-        Map<String, Object> result = agentService.summarizeReport(risks, "服务");
+        List<ScanRiskItem> risks = List.of(buildRiskItem(1, "LOW"));
+        SummarizeResult result = agentService.summarizeReport(risks, "服务");
 
-        assertEquals("无风险", result.get("summary"));
-        assertNotNull(result.get("risks"));
-        assertEquals(1, ((List) result.get("risks")).size());
+        assertEquals("无风险", result.getSummary());
+        assertNotNull(result.getRisks());
+        assertEquals(1, result.getRisks().size());
     }
 
     @Test
@@ -156,16 +158,15 @@ class AgentServiceImplTest {
         String json = "{\"summary\": \"无风险\", \"risks\": []}";
         mockLLMResponse(json);
 
-        Map<String, Object> result = agentService.summarizeReport(List.of(), "其他");
+        SummarizeResult result = agentService.summarizeReport(List.of(), "其他");
 
-        Map<String, Integer> count = (Map<String, Integer>) result.get("riskCount");
-        assertEquals(0, count.get("high").intValue());
-        assertEquals(0, count.get("medium").intValue());
-        assertEquals(0, count.get("low").intValue());
+        assertEquals(0, result.getRiskCount().get("high").intValue());
+        assertEquals(0, result.getRiskCount().get("medium").intValue());
+        assertEquals(0, result.getRiskCount().get("low").intValue());
     }
 
     @Test
-    @DisplayName("Agent C: LLM 返回 null 时返回带默认值的 Map")
+    @DisplayName("Agent C: LLM 返回 null 时返回带默认值的结果")
     void testSummarizeNullResponse() {
         ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
         ChatClient.ChatClientRequestSpec request = mock(ChatClient.ChatClientRequestSpec.class);
@@ -174,10 +175,18 @@ class AgentServiceImplTest {
         when(request.call()).thenReturn(callSpec);
         when(callSpec.content()).thenReturn(null);
 
-        Map<String, Object> result = agentService.summarizeReport(List.of(), "其他");
+        SummarizeResult result = agentService.summarizeReport(new ArrayList<>(), "其他");
 
-        assertFalse(result.isEmpty());
-        assertNotNull(result.get("riskCount"));
-        assertNotNull(result.get("risks"));
+        assertNotNull(result.getSummary());
+        assertNotNull(result.getRiskCount());
+        assertNotNull(result.getRisks());
+    }
+
+    private ScanRiskItem buildRiskItem(int clauseIndex, String level) {
+        ScanRiskItem item = new ScanRiskItem();
+        item.setClauseIndex(clauseIndex);
+        item.setRiskLevel(level);
+        item.setDescription("风险" + clauseIndex);
+        return item;
     }
 }

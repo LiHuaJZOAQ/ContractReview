@@ -5,6 +5,7 @@ import com.contractreview.domain.dto.AuthResponse;
 import com.contractreview.domain.entity.User;
 import com.contractreview.mapper.UserMapper;
 import com.contractreview.security.JwtUtils;
+import com.contractreview.service.SystemConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -35,13 +37,16 @@ class AuthServiceImplTest {
     private RedisTemplate<String, Object> redisTemplate;
     @Mock
     private ValueOperations<String, Object> valueOps;
+    @Mock
+    private SystemConfigService systemConfigService;
 
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        authService = new AuthServiceImpl(userMapper, jwtUtils, redisTemplate);
+        when(systemConfigService.getInt(eq("default_quota"), anyInt())).thenReturn(100);
+        authService = new AuthServiceImpl(userMapper, jwtUtils, redisTemplate, systemConfigService);
     }
 
     @Test
@@ -83,6 +88,7 @@ class AuthServiceImplTest {
         user.setId(1L);
         user.setUsername("testuser");
         user.setPasswordHash(BCrypt.hashpw("password123", BCrypt.gensalt()));
+        user.setReviewQuota(10);
 
         when(userMapper.selectOne(any())).thenReturn(user);
         when(jwtUtils.generateAccessToken(1L)).thenReturn("access-token");
@@ -118,6 +124,7 @@ class AuthServiceImplTest {
         User user = new User();
         user.setId(1L);
         user.setUsername("testuser");
+        user.setReviewQuota(5);
 
         when(valueOps.get("refresh:token:old-refresh")).thenReturn("1");
         when(userMapper.selectById(1L)).thenReturn(user);

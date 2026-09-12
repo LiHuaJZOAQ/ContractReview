@@ -9,12 +9,14 @@ import java.util.List;
 
 public interface ContractService {
     UploadResponse upload(MultipartFile file, Long userId, boolean desensitize);
+    UploadResponse pasteText(String text, Long userId, boolean desensitize);
     void submit(Long taskId, Long userId);
     StatusResponse getStatus(Long taskId, Long userId);
     ReportResponse getReport(Long taskId, Long userId);
     HistoryResponse getHistory(Long userId, int page, int size, String status);
     void retry(Long taskId, Long userId);
     String getPreviewText(Long taskId, Long userId);
+    void updatePreviewText(Long taskId, Long userId, String newText);
     List<ReviewProcessLogDto> getProcessLogs(Long taskId, Long userId);
 
     @Data

@@ -42,6 +42,7 @@ replay_pid*
 *.yml.local
 *.yaml.local
 .env
+!.env.example
 
 ### Node / Vue ###
 node_modules/
@@ -75,6 +76,15 @@ minio-data/
 
 ### Agent ###
 AGENTS.md
+CLAUDE.md
+.claude
 
 ### Binary files ###
 *.pdf
+
+### User Settings ###
+.quit
+!src/test/resources/contracts/合同示范文本20210105.pdf
+
+### Local files ###
+local/

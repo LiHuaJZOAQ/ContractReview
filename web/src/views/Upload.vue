@@ -3,43 +3,79 @@
     <div class="upload-card">
       <h2 class="card-title">上传合同文件</h2>
 
-      <div
-        class="upload-area"
-        :class="{ 'has-file': selectedFile, dragover }"
-        @dragover.prevent="dragover = true"
-        @dragleave="dragover = false"
-        @drop.prevent="handleDrop"
-        @click="$refs.fileInput.click()"
-      >
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".pdf,.doc,.docx"
-          class="file-input"
-          @change="handleFileInput"
-        />
-        <div v-if="!selectedFile" class="upload-placeholder">
-          <svg class="upload-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M24 32V16M16 22l8-8 8 8"/>
-            <path d="M40 32v4a4 4 0 01-4 4H12a4 4 0 01-4-4v-4"/>
-          </svg>
-          <p class="upload-text">拖拽文件到此处，或 <span class="upload-link">点击选择</span></p>
-          <p class="upload-hint">支持 PDF、Word 格式，文件不超过 20MB</p>
-        </div>
-        <div v-else class="file-info">
-          <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-          </svg>
-          <div class="file-meta">
-            <span class="file-name">{{ selectedFile.name }}</span>
-            <span class="file-size">{{ formatSize(selectedFile.size) }}</span>
-          </div>
-          <button class="file-remove" @click.stop="clearFile">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
+      <div class="tab-bar">
+        <button :class="['tab-btn', { active: mode === 'file' }]" @click="mode = 'file'">文件上传</button>
+        <button :class="['tab-btn', { active: mode === 'paste' }]" @click="mode = 'paste'">粘贴文本</button>
       </div>
+
+      <template v-if="mode === 'file'">
+        <div
+          class="upload-area"
+          :class="{ 'has-file': selectedFile, dragover }"
+          @dragover.prevent="dragover = true"
+          @dragleave="dragover = false"
+          @drop.prevent="handleDrop"
+          @click="$refs.fileInput.click()"
+        >
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".pdf,.docx,.txt"
+            class="file-input"
+            @change="handleFileInput"
+          />
+          <div v-if="!selectedFile" class="upload-placeholder">
+            <svg class="upload-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M24 32V16M16 22l8-8 8 8" />
+              <path d="M40 32v4a4 4 0 01-4 4H12a4 4 0 01-4-4v-4" />
+            </svg>
+            <p class="upload-text">拖拽文件到此处，或 <span class="upload-link">点击选择</span></p>
+            <p class="upload-hint">支持 PDF、Word、TXT 格式，文件不超过 20MB</p>
+          </div>
+          <div v-else class="file-info">
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14,2 14,8 20,8" />
+            </svg>
+            <div class="file-meta">
+              <span class="file-name">{{ selectedFile.name }}</span>
+              <span class="file-size">{{ formatSize(selectedFile.size) }}</span>
+            </div>
+            <button class="file-remove" @click.stop="clearFile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <button
+          v-if="selectedFile && !previewText"
+          class="btn btn-primary btn-full"
+          :disabled="uploading"
+          @click="handleUpload"
+        >
+          <span v-if="uploading" class="spinner" />
+          {{ uploading ? '上传中...' : '上传预览' }}
+        </button>
+      </template>
+
+      <template v-else>
+        <textarea
+          v-model="pastedText"
+          class="paste-textarea"
+          placeholder="在此粘贴合同文本内容..."
+          rows="12"
+        />
+        <div v-if="pastedText" class="paste-hint">{{ pastedText.length }} 字</div>
+        <button
+          v-if="pastedText && !previewText"
+          class="btn btn-primary btn-full"
+          :disabled="uploading"
+          @click="handlePaste"
+        >
+          <span v-if="uploading" class="spinner" />
+          {{ uploading ? '处理中...' : '预览文本' }}
+        </button>
+      </template>
 
       <div class="option-row">
         <label class="toggle-label">
@@ -50,29 +86,40 @@
         </label>
       </div>
 
-      <button
-        v-if="selectedFile && !previewText"
-        class="btn btn-primary btn-full"
-        :disabled="uploading"
-        @click="handleUpload"
-      >
-        <span v-if="uploading" class="spinner" />
-        {{ uploading ? '上传中...' : '上传预览' }}
-      </button>
-
-      <div v-if="previewText" class="preview-section">
-        <div class="section-label">文本预览</div>
+      <transition name="card-slide-up" mode="out-in">
+        <div v-if="previewText" key="preview" class="preview-section">
+        <div class="section-label">文本预览（可编辑）</div>
         <div class="preview-block">
-          <pre class="preview-text">{{ previewText }}</pre>
+          <div class="find-bar">
+            <el-input v-model="findKw" placeholder="查找" size="small" class="find-input" @keyup.enter="findNext" />
+            <el-input v-model="replaceKw" placeholder="替换为" size="small" class="find-input" />
+            <span class="hit-count">{{ hits.length ? hitIdx + 1 : 0 }}/{{ hits.length }}</span>
+            <el-button size="small" :disabled="!hits.length" @click="findPrev">上一处</el-button>
+            <el-button size="small" :disabled="!hits.length" @click="findNext">下一处</el-button>
+            <el-button size="small" :disabled="!hits.length" @click="replaceOne">替换</el-button>
+            <el-button size="small" type="primary" :disabled="!hits.length" @click="replaceAll">全部替换</el-button>
+          </div>
+          <el-input
+            v-model="editablePreview"
+            type="textarea"
+            :rows="14"
+            class="preview-textarea"
+            placeholder="脱敏预览文本，可编辑后保存"
+          />
         </div>
         <div class="action-row">
+          <button class="btn btn-secondary" :disabled="saving || !editablePreview.trim()" @click="savePreview">
+            <span v-if="saving" class="spinner" />
+            {{ saving ? '保存中...' : '保存预览' }}
+          </button>
           <button class="btn btn-secondary" @click="handleBack">返回</button>
           <button class="btn btn-primary" :disabled="submitting" @click="handleSubmit">
             <span v-if="submitting" class="spinner" />
             {{ submitting ? '提交中...' : '提交审查' }}
           </button>
         </div>
-      </div>
+        </div>
+      </transition>
     </div>
 
     <SseProgress ref="sseRef" :task-id="currentTaskId" @complete="onComplete" @error="onError" />
@@ -80,21 +127,82 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { uploadFile, submitTask } from '@/api/contract'
+import { uploadFile, pasteText, submitTask, updatePreview } from '@/api/contract'
+import { useAuthStore } from '@/stores/auth'
 import SseProgress from '@/components/SseProgress.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
 const sseRef = ref(null)
 const desensitize = ref(true)
 const previewText = ref('')
+const editablePreview = ref('')
 const currentTaskId = ref(null)
 const selectedFile = ref(null)
 const uploading = ref(false)
 const submitting = ref(false)
+const saving = ref(false)
 const dragover = ref(false)
+const mode = ref('file')
+const pastedText = ref('')
+
+// 查找替换状态
+const findKw = ref('')
+const replaceKw = ref('')
+const hits = ref([])
+const hitIdx = ref(0)
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function recomputeHits() {
+  if (!findKw.value) {
+    hits.value = []
+    hitIdx.value = 0
+    return
+  }
+  const re = new RegExp(escapeRegExp(findKw.value), 'g')
+  const list = []
+  let m
+  while ((m = re.exec(editablePreview.value)) !== null) {
+    list.push(m.index)
+    if (m.index === re.lastIndex) re.lastIndex++
+  }
+  hits.value = list
+  hitIdx.value = list.length ? 0 : -1
+}
+
+function findNext() {
+  if (!hits.value.length) return
+  hitIdx.value = (hitIdx.value + 1) % hits.value.length
+}
+
+function findPrev() {
+  if (!hits.value.length) return
+  hitIdx.value = (hitIdx.value - 1 + hits.value.length) % hits.value.length
+}
+
+function replaceOne() {
+  if (!hits.value.length) return
+  const i = hits.value[hitIdx.value]
+  editablePreview.value =
+    editablePreview.value.slice(0, i) + replaceKw.value +
+    editablePreview.value.slice(i + findKw.value.length)
+  recomputeHits()
+}
+
+function replaceAll() {
+  if (!findKw.value) return
+  const re = new RegExp(escapeRegExp(findKw.value), 'g')
+  editablePreview.value = editablePreview.value.replace(re, replaceKw.value)
+  recomputeHits()
+}
+
+watch([findKw, editablePreview], recomputeHits)
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -131,9 +239,25 @@ async function handleUpload() {
   try {
     const res = await uploadFile(selectedFile.value, desensitize.value)
     previewText.value = res.previewText
+    editablePreview.value = res.previewText
     currentTaskId.value = res.taskId
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function handlePaste() {
+  if (!pastedText.value.trim()) return
+  uploading.value = true
+  try {
+    const res = await pasteText(pastedText.value, desensitize.value)
+    previewText.value = res.previewText
+    editablePreview.value = res.previewText
+    currentTaskId.value = res.taskId
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '处理失败')
   } finally {
     uploading.value = false
   }
@@ -145,6 +269,9 @@ async function handleSubmit() {
   try {
     await submitTask(currentTaskId.value)
     submitting.value = false
+    // 提交成功后由后端扣减配额，前端不应直接修改本地缓存
+    // 而应在提交完成后调用 auth.fetchProfile() 同步真实配额，或在页面可见时刷新
+    await auth.fetchProfile()
     sseRef.value.open()
   } catch (e) {
     submitting.value = false
@@ -152,9 +279,29 @@ async function handleSubmit() {
   }
 }
 
+async function savePreview() {
+  if (!currentTaskId.value) return
+  saving.value = true
+  try {
+    await updatePreview(currentTaskId.value, editablePreview.value)
+    previewText.value = editablePreview.value
+    ElMessage.success('预览已保存')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
 function handleBack() {
   previewText.value = ''
+  editablePreview.value = ''
   currentTaskId.value = null
+  pastedText.value = ''
+  findKw.value = ''
+  replaceKw.value = ''
+  hits.value = []
+  hitIdx.value = 0
 }
 
 function onComplete() {
@@ -184,7 +331,66 @@ function onError(msg) {
   font-size: var(--text-xl);
   font-weight: 600;
   color: var(--color-text-primary);
-  margin: 0 0 var(--space-6);
+  margin: 0 0 var(--space-5);
+}
+
+.tab-bar {
+  display: flex;
+  gap: var(--space-1);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin-bottom: var(--space-5);
+}
+.tab-btn {
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-ui);
+}
+.tab-btn.active {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-xs);
+}
+.tab-btn:hover:not(.active) {
+  color: var(--color-text-primary);
+}
+
+.paste-textarea {
+  width: 100%;
+  min-height: 240px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+}
+.paste-textarea:focus {
+  border-color: var(--color-accent);
+}
+.paste-textarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+.paste-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: right;
+  margin-top: var(--space-1);
 }
 
 .upload-area {
@@ -399,18 +605,48 @@ function onError(msg) {
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-md);
   padding: var(--space-4);
-  max-height: 320px;
+  max-height: 480px;
   overflow-y: auto;
 }
 
-.preview-text {
+.preview-textarea {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
+}
+
+.preview-textarea :deep(textarea) {
+  background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
+}
+
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.find-input {
+  width: 140px;
+}
+
+.find-input :deep(input) {
+  font-size: var(--text-xs);
+  padding: 4px 8px;
+}
+
+.hit-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  min-width: 48px;
+  text-align: center;
+}
+
+.find-bar .el-button {
+  font-size: var(--text-xs);
+  padding: 4px 10px;
 }
 
 .action-row {

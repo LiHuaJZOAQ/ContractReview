@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -71,10 +72,13 @@ public class RagServiceImpl implements RagService {
     }
 
     private List<String> searchLocal(String chunkContent) {
+        String query = adaptiveTruncate(chunkContent);
         try {
-            SearchRequest request = SearchRequest.query(chunkContent)
+            FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+            SearchRequest request = SearchRequest.query(query)
                     .withTopK(3)
-                    .withSimilarityThreshold((float) similarityThreshold);
+                    .withSimilarityThreshold((float) similarityThreshold)
+                    .withFilterExpression(filterBuilder.eq("enabled", "true").build());
             return vectorStore.similaritySearch(request).stream()
                     .map(doc -> doc.getContent())
                     .collect(Collectors.toList());
@@ -82,6 +86,14 @@ public class RagServiceImpl implements RagService {
             log.warn("Chroma search failed (falling back to LLM): {}", e.getMessage());
             return List.of();
         }
+    }
+
+    private String adaptiveTruncate(String text) {
+        if (text == null || text.isEmpty()) return "";
+        int len = text.length();
+        if (len <= 400) return text;
+        int half = len / 2;
+        return text.substring(0, Math.min(half + 100, len));
     }
 
     private List<String> llmRetrieve(String chunkContent) {

@@ -21,4 +21,7 @@ public class ReviewReport {
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
+
+    @TableLogic
+    private Integer deleted;
 }

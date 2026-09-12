@@ -1,16 +1,23 @@
 package com.contractreview.config;
 
-import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.util.Timeout;
+import com.contractreview.util.LogTruncator;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
 
+@Slf4j
 @Configuration
 public class SpringAiConfig {
+
+    @Value("${spring.ai.openai.api-key:}")
+    private String apiKey;
+
+    @Value("${spring.ai.openai.base-url:}")
+    private String baseUrl;
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
@@ -18,15 +25,30 @@ public class SpringAiConfig {
     }
 
     @Bean
-    public RestClient.Builder restClientBuilder() {
-        RequestConfig config = RequestConfig.custom()
-                .setConnectionRequestTimeout(Timeout.ofMinutes(2))
-                .setResponseTimeout(Timeout.ofMinutes(2))
-                .build();
-        var client = HttpClients.custom()
-                .setDefaultRequestConfig(config)
-                .build();
-        return RestClient.builder()
-                .requestFactory(new HttpComponentsClientHttpRequestFactory(client));
+    public ApplicationRunner llmConnectionTester(ChatClient chatClient) {
+        return new ApplicationRunner() {
+            @Override
+            public void run(ApplicationArguments args) {
+                if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("$")) {
+                    log.warn("LLM API key not configured, skipping connection test");
+                    return;
+                }
+                try {
+                    String response = chatClient.prompt()
+                            .user("reply OK without any other words")
+                            .call()
+                            .content();
+                    if (response != null && !response.isBlank()) {
+                        log.info("LLM API connection test passed, base-url={}", baseUrl);
+                    } else {
+                        log.warn("LLM API returned empty response, please check model endpoint");
+                    }
+                } catch (Exception e) {
+                    log.error("LLM API connection test failed: {} (url={})", LogTruncator.truncate(e.getMessage(), 200), baseUrl);
+                    log.error("Please verify LLM_API_BASE_URL and LLM_API_KEY environment variables");
+                    log.error("[提示]请检查LLM_API_BASE_URL是否以v1结尾，正确写法不带v1后缀");
+                }
+            }
+        };
     }
 }

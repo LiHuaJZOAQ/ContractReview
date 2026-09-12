@@ -1,6 +1,8 @@
 package com.contractreview.common;
 
+import com.contractreview.config.MdcFilter;
 import lombok.Data;
+import org.slf4j.MDC;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -21,6 +23,7 @@ public class R<T> {
         r.message = "success";
         r.data = data;
         r.timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        r.requestId = MDC.get(MdcFilter.TRACE_ID);
         return r;
     }
 
@@ -33,6 +36,7 @@ public class R<T> {
         r.code = code;
         r.message = message;
         r.timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        r.requestId = MDC.get(MdcFilter.TRACE_ID);
         return r;
     }
 }

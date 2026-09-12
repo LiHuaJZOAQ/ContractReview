@@ -7,7 +7,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{js,vue,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,vue,json,css}\""
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
@@ -18,9 +22,14 @@
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vue/test-utils": "^2.4.11",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
     "happy-dom": "^20.10.6",
+    "prettier": "^3.9.6",
     "vite": "^5.4.0",
     "vitest": "^2.1.0"
   }

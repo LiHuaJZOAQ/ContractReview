@@ -4,7 +4,8 @@ import com.contractreview.service.SseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import java.io.IOException;
 import java.util.Map;
@@ -24,7 +25,7 @@ class SseServiceImplTest {
     @Test
     @DisplayName("创建 Emitter 后可通过同一个 taskId 发送进度")
     void testCreateAndSend() {
-        SseEmitter emitter = sseService.createEmitter(1L);
+        ResponseBodyEmitter emitter = sseService.createEmitter(1L);
 
         assertNotNull(emitter);
         assertDoesNotThrow(() -> sseService.sendProgress(1L, "PARSING", 5, "解析中"));
@@ -74,35 +75,22 @@ class SseServiceImplTest {
 
     @Test
     @DisplayName("Emitter 发送失败时自动移除")
-    void testSendFailureRemovesEmitter() {
-        SseEmitter emitter = mock(SseEmitter.class);
-        try {
-            doThrow(new IOException("Connection lost")).when(emitter)
-                    .send(any(SseEmitter.SseEventBuilder.class));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    void testSendFailureRemovesEmitter() throws Exception {
+        ResponseBodyEmitter emitter = mock(ResponseBodyEmitter.class);
+        doThrow(new IOException("Connection lost")).when(emitter).send(anyString(), any(MediaType.class));
 
         sseService.createEmitter(1L);
 
-        try {
-            var field = SseServiceImpl.class.getDeclaredField("emitters");
-            field.setAccessible(true);
-            Map<Long, SseEmitter> emitters = (Map<Long, SseEmitter>) field.get(sseService);
-            emitters.put(1L, emitter);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        var field = SseServiceImpl.class.getDeclaredField("emitters");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<Long, ResponseBodyEmitter> emitters = (Map<Long, ResponseBodyEmitter>) field.get(sseService);
+        emitters.put(1L, emitter);
 
         sseService.sendProgress(1L, "PARSING", 5, "解析中");
 
-        try {
-            var field = SseServiceImpl.class.getDeclaredField("emitters");
-            field.setAccessible(true);
-            Map<Long, SseEmitter> emitters = (Map<Long, SseEmitter>) field.get(sseService);
-            assertNull(emitters.get(1L));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        @SuppressWarnings("unchecked")
+        Map<Long, ResponseBodyEmitter> after = (Map<Long, ResponseBodyEmitter>) field.get(sseService);
+        assertNull(after.get(1L));
     }
 }

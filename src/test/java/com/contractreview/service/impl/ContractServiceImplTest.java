@@ -76,10 +76,11 @@ class ContractServiceImplTest {
     @Test
     @DisplayName("上传成功（脱敏）")
     void testUploadSuccessWithDesensitize() throws Exception {
+        String originalRaw = "甲方：张三，身份证号：110101199001011234";
         MockMultipartFile file = new MockMultipartFile("file", "contract.pdf",
-                "application/pdf", "甲方：张三，身份证号：110101199001011234".getBytes());
+                "application/pdf", originalRaw.getBytes());
         doNothing().when(fileUtil).validateFile(any());
-        when(fileUtil.extractText(any())).thenReturn("甲方：***，身份证号：***");
+        when(fileUtil.extractText(any())).thenReturn(originalRaw);
         when(minioClient.putObject(any())).thenReturn(null);
         doAnswer(inv -> {
             ReviewTask t = inv.getArgument(0);
@@ -94,8 +95,13 @@ class ContractServiceImplTest {
         assertEquals("甲方：***，身份证号：***", resp.getPreviewText());
         ArgumentCaptor<ReviewTask> captor = ArgumentCaptor.forClass(ReviewTask.class);
         verify(taskMapper).insert(captor.capture());
-        assertEquals("PENDING", captor.getValue().getStatus());
-        assertEquals(userId, captor.getValue().getUserId());
+        ReviewTask saved = captor.getValue();
+        assertEquals("PENDING", saved.getStatus());
+        assertEquals(userId, saved.getUserId());
+        // rawText 必须是未脱敏原文
+        assertEquals(originalRaw, saved.getRawText());
+        // previewText 已被脱敏
+        assertNotEquals(originalRaw, saved.getPreviewText());
     }
 
     @Test
@@ -160,12 +166,17 @@ class ContractServiceImplTest {
     void testSubmitSuccess() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
+        User user = new User();
+        user.setId(userId);
+        user.setReviewQuota(5);
+        when(userMapper.selectById(userId)).thenReturn(user);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(5)))
                 .thenReturn(4L);
 
         contractService.submit(taskId, userId);
 
-        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1));
+        verify(userMapper).selectById(userId);
+        verify(redisTemplate).execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(5));
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessage.class));
     }
 
@@ -204,13 +215,10 @@ class ContractServiceImplTest {
     }
 
     @Test
-    @DisplayName("提交时 Redis 无配额缓存且用户也不存在")
-    void testSubmitNoQuotaInRedisAndUserNotFound() {
+    @DisplayName("提交时用户不存在")
+    void testSubmitUserNotFound() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
-                .thenReturn(-1L);
-        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(false);
         when(userMapper.selectById(userId)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -223,13 +231,12 @@ class ContractServiceImplTest {
     void testSubmitQuotaInsufficient() {
         ReviewTask task = createPendingTask();
         when(taskMapper.selectById(taskId)).thenReturn(task);
-        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1)))
-                .thenReturn(-1L);
         User user = new User();
         user.setId(userId);
         user.setReviewQuota(0);
         when(userMapper.selectById(userId)).thenReturn(user);
-        when(redisTemplate.hasKey("user:quota:" + userId)).thenReturn(true);
+        when(redisTemplate.execute(eq(quotaDeductScript), eq(Collections.singletonList("user:quota:" + userId)), eq(1), eq(0)))
+                .thenReturn(-1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.submit(taskId, userId));
@@ -394,5 +401,66 @@ class ContractServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.retry(taskId, userId));
         assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
+    }
+
+    // ==================== updatePreviewText ====================
+
+    @Test
+    @DisplayName("更新预览文本成功")
+    void testUpdatePreviewTextSuccess() {
+        ReviewTask task = createPendingTask();
+        when(taskMapper.selectById(taskId)).thenReturn(task);
+        when(taskMapper.updateById(any(ReviewTask.class))).thenReturn(1);
+
+        contractService.updatePreviewText(taskId, userId, "用户编辑后的预览文本");
+
+        ArgumentCaptor<ReviewTask> captor = ArgumentCaptor.forClass(ReviewTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        assertEquals("用户编辑后的预览文本", captor.getValue().getPreviewText());
+    }
+
+    @Test
+    @DisplayName("更新预览：PARSING 状态允许")
+    void testUpdatePreviewTextParsingAllowed() {
+        ReviewTask task = createPendingTask();
+        task.setStatus("PARSING");
+        when(taskMapper.selectById(taskId)).thenReturn(task);
+
+        contractService.updatePreviewText(taskId, userId, "新文本");
+
+        verify(taskMapper).updateById(any(ReviewTask.class));
+    }
+
+    @Test
+    @DisplayName("更新预览：REVIEWING 状态拒绝")
+    void testUpdatePreviewTextReviewingRejected() {
+        ReviewTask task = createPendingTask();
+        task.setStatus("REVIEWING");
+        when(taskMapper.selectById(taskId)).thenReturn(task);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.updatePreviewText(taskId, userId, "新文本"));
+        assertEquals(ErrorCode.INVALID_STATE.getCode(), ex.getCode());
+        verify(taskMapper, never()).updateById(any(ReviewTask.class));
+    }
+
+    @Test
+    @DisplayName("更新预览：超过 200000 字符拒绝")
+    void testUpdatePreviewTextTooLong() {
+        String tooLong = "x".repeat(200001);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.updatePreviewText(taskId, userId, tooLong));
+        assertEquals(400, ex.getCode());
+    }
+
+    @Test
+    @DisplayName("更新预览：任务不属于当前用户")
+    void testUpdatePreviewTextWrongUser() {
+        ReviewTask task = createPendingTask();
+        task.setUserId(999L);
+        when(taskMapper.selectById(taskId)).thenReturn(task);
+
+        assertThrows(BusinessException.class,
+                () -> contractService.updatePreviewText(taskId, userId, "新文本"));
     }
 }

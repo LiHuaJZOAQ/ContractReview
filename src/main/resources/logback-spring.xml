@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="contract-review"/>
+    <springProperty scope="context" name="LOG_DIR" source="logging.file.path" defaultValue="./logs"/>
+
+    <timestamp key="startTime" datePattern="yyyy-MM-dd-HH-mm-ss"/>
+
+    <!-- 控制台用：消息截断 + 短堆栈（5帧, msg 200字符） -->
+    <conversionRule conversionWord="ex" converterClass="com.contractreview.util.ShortThrowableConverter"/>
+
+    <!-- 文件用：完整堆栈，不截断 -->
+    <conversionRule conversionWord="exFull" converterClass="com.contractreview.util.FullThrowableConverter"/>
+
+    <appender name="FILE_DEV" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_DIR}/contract-app-dev-${startTime}.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n%exFull</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE_PROD" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/contract-app-prod.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/contract-app-prod.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [${APP_NAME},%X{traceId:-},%X{userId:-}] %40.40logger{40} : %msg%n%exFull</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %5p [%X{traceId:-},%X{userId:-}] %40.40logger{40} : %replace(%msg){'^(.{300}).+$', '$1...[truncated]'}%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="CONSOLE"/>
+    </appender>
+
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="FILE_DEV"/>
+            <appender-ref ref="ASYNC_CONSOLE"/>
+        </root>
+        <logger name="com.contractreview" level="DEBUG"/>
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.springframework.amqp" level="WARN"/>
+        <logger name="org.springframework.ai" level="WARN"/>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="FILE_PROD"/>
+            <appender-ref ref="ASYNC_CONSOLE"/>
+        </root>
+        <logger name="com.contractreview" level="INFO"/>
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.hibernate" level="WARN"/>
+        <logger name="org.springframework.amqp" level="WARN"/>
+        <logger name="org.springframework.ai" level="WARN"/>
+    </springProfile>
+</configuration>

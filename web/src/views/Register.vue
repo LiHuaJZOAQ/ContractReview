@@ -1,6 +1,6 @@
 <template>
   <div class="auth-page">
-    <div class="auth-card">
+    <div class="auth-card" style="animation: fade-in 0.3s ease-out">
       <div class="auth-logo">
         <img src="@/assets/logo.svg" alt="Logo" />
       </div>
@@ -14,6 +14,7 @@
             placeholder="用户名"
             size="large"
             :prefix-icon="User"
+            @keyup.enter="handleRegister"
           />
         </el-form-item>
         <el-form-item prop="password">
@@ -24,6 +25,7 @@
             size="large"
             :prefix-icon="Lock"
             show-password
+            @keyup.enter="handleRegister"
           />
         </el-form-item>
         <el-form-item prop="confirmPassword">
@@ -34,6 +36,7 @@
             size="large"
             :prefix-icon="Lock"
             show-password
+            @keyup.enter="handleRegister"
           />
         </el-form-item>
         <el-button
@@ -174,5 +177,10 @@ async function handleRegister() {
 }
 .auth-link a {
   font-weight: 500;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

@@ -10,6 +10,7 @@ import com.contractreview.domain.entity.ReviewTask;
 import com.contractreview.domain.entity.RiskItem;
 import com.contractreview.domain.entity.User;
 import com.contractreview.domain.enums.ErrorCode;
+import com.contractreview.domain.enums.TaskStatus;
 import com.contractreview.domain.entity.ReviewProcessLog;
 import com.contractreview.mapper.*;
 import com.contractreview.service.ContractService;
@@ -76,7 +77,7 @@ public class ContractServiceImpl implements ContractService {
     public UploadResponse upload(MultipartFile file, Long userId, boolean desensitize) {
         fileUtil.validateFile(file);
         String rawText = fileUtil.extractText(file);
-        String processedText = desensitize ? DesensitizationUtil.desensitize(rawText) : rawText;
+        String processedText = desensitize ? DesensitizationUtil.desensitizeHeader(rawText) : rawText;
 
         String fileUrl = uploadToMinio(file, userId);
 
@@ -85,8 +86,31 @@ public class ContractServiceImpl implements ContractService {
         task.setFileName(file.getOriginalFilename());
         task.setFileSize(file.getSize());
         task.setPreviewText(processedText);
+        task.setRawText(rawText);
         task.setFileUrl(fileUrl);
-        task.setStatus("PENDING");
+        task.setStatus(TaskStatus.PENDING.name());
+        task.setProgress(0);
+        taskMapper.insert(task);
+
+        return new UploadResponse(task.getId(), processedText);
+    }
+
+    @Override
+    @Transactional
+    public UploadResponse pasteText(String text, Long userId, boolean desensitize) {
+        if (text == null || text.trim().isEmpty()) {
+            throw new BusinessException(400, "合同文本不能为空");
+        }
+        String processedText = desensitize ? DesensitizationUtil.desensitizeHeader(text) : text;
+
+        ReviewTask task = new ReviewTask();
+        task.setUserId(userId);
+        task.setFileName("粘贴文本_" + System.currentTimeMillis() + ".txt");
+        task.setFileSize((long) text.getBytes().length);
+        task.setPreviewText(processedText);
+        task.setRawText(text);
+        task.setFileUrl(null);
+        task.setStatus(TaskStatus.PENDING.name());
         task.setProgress(0);
         taskMapper.insert(task);
 
@@ -119,94 +143,25 @@ public class ContractServiceImpl implements ContractService {
         if (!task.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
         }
-        if (!"PENDING".equals(task.getStatus())) {
+        if (!TaskStatus.PENDING.name().equals(task.getStatus())) {
             throw new BusinessException(ErrorCode.INVALID_STATE);
         }
 
         String quotaKey = "user:quota:" + userId;
-        Long newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        Long newQuota = redisTemplate.execute(quotaDeductScript,
+                Collections.singletonList(quotaKey), 1, user.getReviewQuota());
         if (newQuota == null || newQuota < 0) {
-            User user = userMapper.selectById(userId);
-            if (user == null) {
-                throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
-            }
-            if (!redisTemplate.hasKey(quotaKey)) {
-                redisTemplate.opsForValue().set(quotaKey, user.getReviewQuota());
-                newQuota = redisTemplate.execute(quotaDeductScript, Collections.singletonList(quotaKey), 1);
-            }
-            if (newQuota == null || newQuota < 0) {
-                throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
-            }
+            throw new BusinessException(ErrorCode.QUOTA_INSUFFICIENT);
         }
 
         ReviewMessage message = new ReviewMessage(taskId, userId, 0);
         rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE_REVIEW,
                 RabbitMqConfig.ROUTING_KEY, message);
         log.info("Sent review message to MQ: taskId={}, userId={}", taskId, userId);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void saveReviewResult(Long taskId, String llmResult) {
-        Map<String, Object> result;
-        try {
-            result = objectMapper.readValue(llmResult, Map.class);
-        } catch (Exception e) {
-            log.warn("LLM result may not be valid JSON, storing raw: {}", e.getMessage());
-            result = new HashMap<>();
-            result.put("summary", llmResult);
-            result.put("risks", List.of());
-        }
-
-        String summary = (String) result.getOrDefault("summary", "");
-
-        List<Map<String, Object>> risks;
-        Object r = result.get("risks");
-        if (r instanceof List) {
-            risks = (List<Map<String, Object>>) r;
-        } else {
-            risks = List.of();
-        }
-
-        int high = 0, medium = 0, low = 0;
-        for (Map<String, Object> riskMap : risks) {
-            RiskItem item = new RiskItem();
-            item.setTaskId(taskId);
-            item.setClauseIndex((Integer) riskMap.getOrDefault("clauseIndex", 0));
-            item.setClauseContent((String) riskMap.getOrDefault("clauseContent", ""));
-            item.setRiskLevel((String) riskMap.getOrDefault("riskLevel", "LOW"));
-            item.setRiskType((String) riskMap.getOrDefault("riskType", ""));
-            item.setDescription((String) riskMap.getOrDefault("description", ""));
-            item.setSuggestion((String) riskMap.getOrDefault("suggestion", ""));
-            Object laws = riskMap.get("relatedLaws");
-            if (laws instanceof List) {
-                try {
-                    item.setRelatedLaws(objectMapper.writeValueAsString(laws));
-                } catch (JsonProcessingException e) {
-                    log.warn("Failed to serialize relatedLaws", e);
-                }
-            }
-            riskItemMapper.insert(item);
-
-            String level = ((String) riskMap.getOrDefault("riskLevel", "LOW")).toUpperCase();
-            switch (level) {
-                case "HIGH": high++; break;
-                case "MEDIUM": medium++; break;
-                default: low++;
-            }
-        }
-
-        ReviewReport report = new ReviewReport();
-        report.setTaskId(taskId);
-        report.setSummary(summary);
-        report.setRiskCountHigh(high);
-        report.setRiskCountMedium(medium);
-        report.setRiskCountLow(low);
-        try {
-            report.setReportJson(objectMapper.writeValueAsString(result));
-        } catch (Exception e) {
-            report.setReportJson("{}");
-        }
-        reportMapper.insert(report);
     }
 
     @Override
@@ -224,7 +179,7 @@ public class ContractServiceImpl implements ContractService {
         if (task == null || !task.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
         }
-        if (!"SUCCESS".equals(task.getStatus())) {
+        if (!TaskStatus.SUCCESS.name().equals(task.getStatus())) {
             throw new BusinessException(ErrorCode.INVALID_STATE, "任务尚未完成");
         }
 
@@ -241,7 +196,9 @@ public class ContractServiceImpl implements ContractService {
             if (item.getRelatedLaws() != null && !item.getRelatedLaws().isEmpty()) {
                 try {
                     laws = objectMapper.readValue(item.getRelatedLaws(), List.class);
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    log.warn("Failed to deserialize relatedLaws for risk item {}: {}", item.getId(), e.getMessage());
+                }
             }
             return new RiskItemDto(item.getClauseIndex(), item.getClauseContent(),
                     item.getRiskLevel(), item.getRiskType(), item.getDescription(),
@@ -293,6 +250,24 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
+    @Transactional
+    public void updatePreviewText(Long taskId, Long userId, String newText) {
+        if (newText == null || newText.length() > 200_000) {
+            throw new BusinessException(400, "预览文本不能超过 200000 字符");
+        }
+        ReviewTask task = taskMapper.selectById(taskId);
+        if (task == null || !task.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
+        }
+        String status = task.getStatus();
+        if (!TaskStatus.PENDING.name().equals(status) && !TaskStatus.PARSING.name().equals(status)) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "仅待处理或解析中状态可修改预览");
+        }
+        task.setPreviewText(newText);
+        taskMapper.updateById(task);
+    }
+
+    @Override
     public List<ContractService.ReviewProcessLogDto> getProcessLogs(Long taskId, Long userId) {
         ReviewTask task = taskMapper.selectById(taskId);
         if (task == null || !task.getUserId().equals(userId)) {
@@ -316,11 +291,11 @@ public class ContractServiceImpl implements ContractService {
         if (task == null || !task.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.TASK_NOT_FOUND);
         }
-        if (!"FAILED".equals(task.getStatus())) {
+        if (!TaskStatus.FAILED.name().equals(task.getStatus())) {
             throw new BusinessException(ErrorCode.INVALID_STATE, "仅失败状态的任务可重试");
         }
 
-        task.setStatus("PENDING");
+        task.setStatus(TaskStatus.PENDING.name());
         task.setProgress(0);
         task.setErrorMsg(null);
         task.setCompletedAt(null);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { setActivePinia, createPinia } from 'pinia'
 
 const routes = [
@@ -23,7 +23,7 @@ describe('router navigation guard', () => {
     localStorage.clear()
 
     router = createRouter({
-      history: createWebHistory(),
+      history: createMemoryHistory(),
       routes,
     })
     const { useAuthStore } = await import('@/stores/auth')
